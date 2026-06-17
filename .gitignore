@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+out/
+build/
+
+# user runtime config (seeded from app/config.default.json on first run — keeps personal setups out of git)
+app/config.json
+
+# logs
+*.log
+npm-debug.log*
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+  #stage { position: absolute; top: 0; left: 0; width: 1920px; height: 480px;
+    transform-origin: 0 0; transform: translate(480px, 0) rotate(90deg);
+    background: radial-gradient(140% 200% at 0% 0%, #0e1b2e 0%, #05080d 70%);
+    font-family: 'Segoe UI', system-ui, sans-serif; }
+  #grid { display: grid; width: 1920px; height: 480px; gap: 10px; padding: 12px; box-sizing: border-box; }
+  .tile { display: flex; flex-direction: column; align-items: center; justify-content: center;
+    border-radius: 18px; background: linear-gradient(160deg, #18293d, #0c141f);
+    border: 1px solid #243a55; color: #cfe0f2; user-select: none;
+    transition: transform .06s, background .06s, border-color .06s; }
+  .tile.empty { background: #0a111a; border: 1px dashed #1b2838; }
+  .tile .ic { font-size: 60px; line-height: 1; }
+  .tile .lb { font-size: 20px; margin-top: 8px; color: #9fb3c8; }
+  .tile.hit { background: linear-gradient(160deg, #2b8bff, #0a5bd0); border-color: #7CFFB2;
+    color: #fff; transform: scale(.95); box-shadow: 0 0 28px rgba(43,139,255,.55); }
+  #vol { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 44px;
+    color: #7CFFB2; background: rgba(5,10,16,.85); padding: 18px 30px; border-radius: 16px;
+    opacity: 0; transition: opacity .12s; pointer-events: none; }
+  /* dial selector */
+  #selector { position: absolute; inset: 0; background: rgba(3,6,10,.92); display: none;
+    flex-direction: column; align-items: center; justify-content: center; color: #e8eef6; }
+  #selector.open { display: flex; }
+  .seltitle { font-size: 30px; color: #7CFFB2; letter-spacing: 2px; margin-bottom: 8px; }
+  .selwheel { height: 300px; width: 760px; overflow: hidden; position: relative;
+    -webkit-mask-image: linear-gradient(#0000, #000 32%, #000 68%, #0000); }
+  #selitems { position: absolute; left: 0; right: 0; top: 50%; transition: transform .14s ease-out; }
+  .selitem { height: 76px; display: flex; align-items: center; justify-content: center;
+    font-size: 34px; color: #5f7790; transform: translateY(-50%); }
+  .selitem.sel { font-size: 52px; font-weight: 800; color: #fff; text-shadow: 0 0 22px rgba(124,255,178,.6); }
+  .selhint { margin-top: 10px; font-size: 20px; color: #6b809a; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="grid"></div>
+    <div id="vol">🔊</div>
+    <div id="selector"><div class="seltitle">SELECT GRID</div><div class="selwheel"><div id="selitems"></div></div><div class="selhint">rotate to choose · press to select</div></div>
+  </div>
+<script>
+  const { ipcRenderer } = require('electron');
+  const grid = document.getElementById('grid'), vol = document.getElementById('vol');
+  const selector = document.getElementById('selector'), selitems = document.getElementById('selitems');
+  let cfg = { cols: 8, rows: 2, tiles: [] };
+  let grids = [], activeId = null;
+  let armed = false, idleT = null, lastHit = -1, volT = null;
+  let selOpen = false, selIdx = 0, selAutoClose = null;
+
+  // ---- active grid ----
+  function build() {
+    grid.style.gridTemplateColumns = `repeat(${cfg.cols},1fr)`;
+    grid.style.gridTemplateRows = `repeat(${cfg.rows},1fr)`;
+    grid.innerHTML = '';
+    cfg.tiles.forEach((t, i) => {
+      const d = document.createElement('div');
+      const empty = !t || !t.type;
+      d.className = 'tile' + (empty ? ' empty' : '');
+      d.dataset.i = i;
+      d.innerHTML = empty ? '' : `<div class="ic">${t.icon || '▫️'}</div><div class="lb">${t.label || ''}</div>`;
+      grid.appendChild(d);
+    });
+  }
+  ipcRenderer.on('grid', (e, g) => { cfg = g; build(); });
+  ipcRenderer.on('gridList', (e, d) => { grids = d.grids; activeId = d.activeId; });
+
+  // ---- touch -> launch ----
+  function tileAt(sx, sy) {
+    const col = Math.floor(sx / (1920 / cfg.cols)), row = Math.floor(sy / (480 / cfg.rows));
+    if (col < 0 || col >= cfg.cols || row < 0 || row >= cfg.rows) return -1;
+    return row * cfg.cols + col;
+  }
+  function highlight(i) {
+    if (i === lastHit) return;
+    if (grid.children[lastHit]) grid.children[lastHit].classList.remove('hit');
+    if (i >= 0 && grid.children[i] && cfg.tiles[i] && cfg.tiles[i].type) grid.children[i].classList.add('hit');
+    lastHit = i;
+  }
+  ipcRenderer.on('touch', (e, pts) => {
+    if (selOpen) return; // ignore touch while picking a grid
+    const p = pts.find(p => p.action === 1) || pts[0]; if (!p) return;
+    const i = tileAt(p.x, 480 - p.y);
+    highlight(i);
+    if (!armed && i >= 0 && cfg.tiles[i] && cfg.tiles[i].type) { armed = true; ipcRenderer.send('launch', cfg.tiles[i]); }
+    clearTimeout(idleT);
+    idleT = setTimeout(() => { armed = false; highlight(-1); }, 180);
+  });
+
+  // ---- dial selector ----
+  function renderWheel() {
+    selitems.innerHTML = '';
+    grids.forEach((g, i) => {
+      const d = document.createElement('div');
+      d.className = 'selitem' + (i === selIdx ? ' sel' : '');
+      d.textContent = g.name;
+      selitems.appendChild(d);
+    });
+    selitems.style.transform = `translateY(${-selIdx * 76}px)`;
+  }
+  function openSelector() {
+    if (!grids.length) return;
+    selOpen = true; selIdx = Math.max(0, grids.findIndex(g => g.id === activeId));
+    selector.classList.add('open'); renderWheel(); resetAutoClose();
+  }
+  function closeSelector() { selOpen = false; selector.classList.remove('open'); clearTimeout(selAutoClose); }
+  function moveSelector(dir) { selIdx = Math.min(grids.length - 1, Math.max(0, selIdx + dir)); renderWheel(); resetAutoClose(); }
+  function confirmSelector() { const g = grids[selIdx]; closeSelector(); if (g) ipcRenderer.send('switchGrid', g.id); }
+  function resetAutoClose() { clearTimeout(selAutoClose); selAutoClose = setTimeout(closeSelector, 4500); }
+
+  // ---- knob ----
+  // The knob does click-type detection in hardware: press index 1 = single-click, 2 = double-click.
+  ipcRenderer.on('knob', (e, k) => {
+    if (k.type === 'rotate') {
+      if (selOpen) { moveSelector(k.dir > 0 ? -1 : 1); }   // CW scrolls down the list
+      else { ipcRenderer.send('volume', k.dir > 0 ? 1 : -1); flashVol(k.dir > 0 ? '🔊 +' : '🔉 −'); }
+      return;
+    }
+    if (k.type === 'press') {
+      if (selOpen) { confirmSelector(); return; }           // any press picks the highlighted grid
+      if (k.index === 2) { openSelector(); }                // double-click -> grid selector
+      else { ipcRenderer.send('volume', 'mute'); flashVol('🔇'); }  // single-click -> mute
+    }
+  });
+  function flashVol(t) { vol.textContent = t; vol.style.opacity = 1; clearTimeout(volT); volT = setTimeout(() => vol.style.opacity = 0, 500); }
+</script>
+</body>
+</html>

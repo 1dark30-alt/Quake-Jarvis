@@ -1,0 +1,77 @@
+{
+  "activeGridId": "default",
+  "grids": [
+    {
+      "id": "default",
+      "name": "Default",
+      "cols": 8,
+      "rows": 2,
+      "tiles": [
+        { "label": "Chrome",   "icon": "🌐", "type": "app",    "value": "chrome" },
+        { "label": "Edge",     "icon": "🧭", "type": "app",    "value": "msedge" },
+        { "label": "Files",    "icon": "📁", "type": "app",    "value": "explorer" },
+        { "label": "Notepad",  "icon": "📝", "type": "app",    "value": "notepad" },
+        { "label": "Calc",     "icon": "🧮", "type": "app",    "value": "calc" },
+        { "label": "Tasks",    "icon": "📊", "type": "app",    "value": "taskmgr" },
+        { "label": "Terminal", "icon": "🖥️", "type": "app",    "value": "wt" },
+        { "label": "Settings", "icon": "⚙️", "type": "cmd",    "value": "start ms-settings:" },
+        { "label": "GitHub",   "icon": "🐙", "type": "url",    "value": "https://github.com" },
+        { "label": "Snip",     "icon": "✂️", "type": "app",    "value": "snippingtool" },
+        { "label": "Lock",     "icon": "🔒", "type": "system", "value": "lock" },
+        { "label": "Paint",    "icon": "🎨", "type": "app",    "value": "mspaint" },
+        { "label": "VS Code",  "icon": "🧩", "type": "app",    "value": "code" },
+        { "label": "Control",  "icon": "🛠️", "type": "app",    "value": "control" },
+        { "label": "Spotify",  "icon": "🎵", "type": "url",    "value": "https://open.spotify.com" },
+        { "label": "Edit Grids","icon": "✏️","type": "system", "value": "config" }
+      ]
+    },
+    {
+      "id": "media",
+      "name": "Media",
+      "cols": 8,
+      "rows": 2,
+      "tiles": [
+        { "label": "Spotify",  "icon": "🎵", "type": "url", "value": "https://open.spotify.com" },
+        { "label": "YouTube",  "icon": "📺", "type": "url", "value": "https://youtube.com" },
+        { "label": "Netflix",  "icon": "🍿", "type": "url", "value": "https://www.netflix.com" },
+        { "label": "OBS",      "icon": "🎥", "type": "app", "value": "obs64" },
+        { "label": "Discord",  "icon": "💬", "type": "app", "value": "discord" },
+        { "label": "Mixer",    "icon": "🎚️", "type": "cmd", "value": "start sndvol" },
+        { "label": "",         "icon": "",   "type": "",    "value": "" },
+        { "label": "Edit Grids","icon": "✏️","type": "system","value": "config" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" }
+      ]
+    },
+    {
+      "id": "dev",
+      "name": "Dev",
+      "cols": 8,
+      "rows": 2,
+      "tiles": [
+        { "label": "VS Code",  "icon": "🧩", "type": "app", "value": "code" },
+        { "label": "Terminal", "icon": "🖥️", "type": "app", "value": "wt" },
+        { "label": "GitHub",   "icon": "🐙", "type": "url", "value": "https://github.com" },
+        { "label": "localhost","icon": "🌍", "type": "url", "value": "http://localhost:3000" },
+        { "label": "Tasks",    "icon": "📊", "type": "app", "value": "taskmgr" },
+        { "label": "",         "icon": "",   "type": "",    "value": "" },
+        { "label": "",         "icon": "",   "type": "",    "value": "" },
+        { "label": "Edit Grids","icon": "✏️","type": "system","value": "config" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" },
+        { "label": "", "icon": "", "type": "", "value": "" }
+      ]
+    }
+  ]
+}

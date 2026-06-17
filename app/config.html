@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  body { margin: 0; height: 100vh; display: flex; flex-direction: column;
+    font-family: 'Segoe UI', system-ui, sans-serif; background: #11151c; color: #dbe5f0; }
+  header { padding: 12px 18px; background: #0c1016; border-bottom: 1px solid #1e2733; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 18px; margin: 0; font-weight: 700; }
+  header .sub { color: #6f8298; font-size: 13px; }
+  .main { flex: 1; display: flex; min-height: 0; }
+  .col { padding: 14px; overflow: auto; }
+  .grids { width: 240px; border-right: 1px solid #1e2733; }
+  .editor { flex: 1; }
+  .sectitle { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: #6f8298; margin: 0 0 8px; }
+  .gridrow { padding: 9px 11px; border-radius: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; }
+  .gridrow:hover { background: #182230; }
+  .gridrow.active { background: #16314f; border-color: #2b6fb0; }
+  .gridrow .badge { font-size: 11px; color: #7CFFB2; }
+  button { background: #1c2735; color: #dbe5f0; border: 1px solid #2a3a4e; border-radius: 7px; padding: 7px 12px; cursor: pointer; font-size: 13px; }
+  button:hover { background: #243246; }
+  button.primary { background: #1e6fd0; border-color: #2b8bff; }
+  button.danger { background: #6a1e2a; border-color: #a3354a; }
+  input, select { background: #0e141c; color: #dbe5f0; border: 1px solid #2a3a4e; border-radius: 6px; padding: 7px 9px; font-size: 13px; width: 100%; }
+  .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+  .row label { width: 70px; color: #91a4ba; font-size: 13px; flex: none; }
+  .tilegrid { display: grid; gap: 8px; margin: 10px 0 16px; }
+  .cell { aspect-ratio: 1; border-radius: 12px; background: #141d29; border: 1px solid #233246; cursor: pointer;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; color: #bcd; overflow: hidden; }
+  .cell:hover { border-color: #2b6fb0; }
+  .cell.sel { border-color: #7CFFB2; box-shadow: 0 0 0 2px rgba(124,255,178,.35); }
+  .cell.empty { background: #0d141d; border-style: dashed; color: #3a4a5e; }
+  .cell .ic { font-size: 30px; line-height: 1; } .cell .lb { font-size: 12px; margin-top: 4px; color: #91a4ba; }
+  .form { background: #0e141c; border: 1px solid #1e2733; border-radius: 10px; padding: 14px; max-width: 460px; }
+  .hint { color: #6f8298; font-size: 12px; margin-top: 8px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>DK-QUAKE Grid Editor</h1>
+    <span class="sub" id="status">auto-saves to the panel</span>
+  </header>
+  <div class="main">
+    <div class="col grids">
+      <p class="sectitle">Grids</p>
+      <div id="gridlist"></div>
+      <div class="row" style="margin-top:12px"><button class="primary" id="addGrid">+ Add Grid</button></div>
+    </div>
+    <div class="col editor">
+      <div id="gridmeta"></div>
+      <div id="tilegrid" class="tilegrid"></div>
+      <div id="tileform"></div>
+    </div>
+  </div>
+<script>
+  const { ipcRenderer } = require('electron');
+  let config = { activeGridId: null, grids: [] };
+  let gi = 0, ti = -1, saveT = null;
+  const TYPES = [['', 'Empty'], ['app', 'App / Program'], ['url', 'Website (URL)'], ['cmd', 'Shell command'], ['open', 'Open file/folder'], ['system', 'System (lock/config)']];
+  const uid = () => 'g' + Math.random().toString(36).slice(2, 8);
+  const curGrid = () => config.grids[gi];
+
+  function save(status) {
+    document.getElementById('status').textContent = status || 'saved ✓';
+    clearTimeout(saveT); saveT = setTimeout(() => ipcRenderer.send('saveConfigFromEditor', config), 200);
+  }
+  function ensureTiles(g) { const need = g.cols * g.rows; while (g.tiles.length < need) g.tiles.push({ label: '', icon: '', type: '', value: '' }); g.tiles.length = need; }
+
+  function renderGrids() {
+    const el = document.getElementById('gridlist'); el.innerHTML = '';
+    config.grids.forEach((g, i) => {
+      const d = document.createElement('div');
+      d.className = 'gridrow' + (i === gi ? ' active' : '');
+      d.innerHTML = `<span>${g.name || '(unnamed)'}</span>` + (g.id === config.activeGridId ? '<span class="badge">● on panel</span>' : '');
+      d.onclick = () => { gi = i; ti = -1; render(); };
+      el.appendChild(d);
+    });
+  }
+  function renderMeta() {
+    const g = curGrid(); const el = document.getElementById('gridmeta');
+    if (!g) { el.innerHTML = '<p class="hint">No grid. Click “+ Add Grid”.</p>'; return; }
+    el.innerHTML = `
+      <div class="row"><label>Name</label><input id="gName" value="${g.name || ''}"></div>
+      <div class="row"><label>Columns</label><input id="gCols" type="number" min="1" max="12" value="${g.cols}" style="width:90px">
+        <label style="width:auto;margin-left:10px">Rows</label><input id="gRows" type="number" min="1" max="6" value="${g.rows}" style="width:90px"></div>
+      <div class="row">
+        <button id="gActive">Show on panel</button>
+        <button class="danger" id="gDelete">Delete grid</button>
+      </div>`;
+    document.getElementById('gName').oninput = e => { g.name = e.target.value; renderGrids(); save(); };
+    document.getElementById('gCols').onchange = e => { g.cols = Math.max(1, Math.min(12, +e.target.value || 1)); ensureTiles(g); ti = -1; render(); save(); };
+    document.getElementById('gRows').onchange = e => { g.rows = Math.max(1, Math.min(6, +e.target.value || 1)); ensureTiles(g); ti = -1; render(); save(); };
+    document.getElementById('gActive').onclick = () => { config.activeGridId = g.id; renderGrids(); save('switched panel ✓'); };
+    document.getElementById('gDelete').onclick = () => { if (config.grids.length <= 1) return; config.grids.splice(gi, 1); gi = 0; ti = -1; if (!config.grids.some(x => x.id === config.activeGridId)) config.activeGridId = config.grids[0].id; render(); save(); };
+  }
+  function renderTiles() {
+    const g = curGrid(); const el = document.getElementById('tilegrid');
+    if (!g) { el.innerHTML = ''; return; }
+    ensureTiles(g);
+    el.style.gridTemplateColumns = `repeat(${g.cols}, 1fr)`;
+    el.innerHTML = '';
+    g.tiles.forEach((t, i) => {
+      const empty = !t || !t.type;
+      const d = document.createElement('div');
+      d.className = 'cell' + (i === ti ? ' sel' : '') + (empty ? ' empty' : '');
+      d.innerHTML = empty ? '+' : `<div class="ic">${t.icon || '▫️'}</div><div class="lb">${t.label || ''}</div>`;
+      d.onclick = () => { ti = i; render(); };
+      el.appendChild(d);
+    });
+  }
+  function renderForm() {
+    const g = curGrid(); const el = document.getElementById('tileform');
+    if (!g || ti < 0) { el.innerHTML = '<p class="hint">Pick a tile above to edit it.</p>'; return; }
+    const t = g.tiles[ti];
+    el.innerHTML = `<div class="form">
+      <p class="sectitle">Tile ${ti + 1}</p>
+      <div class="row"><label>Label</label><input id="tLabel" value="${t.label || ''}"></div>
+      <div class="row"><label>Icon</label><input id="tIcon" value="${t.icon || ''}" placeholder="paste an emoji, e.g. 🌐"></div>
+      <div class="row"><label>Type</label><select id="tType">${TYPES.map(([v, n]) => `<option value="${v}" ${v === (t.type || '') ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
+      <div class="row"><label>Value</label><input id="tValue" value="${(t.value || '').replace(/"/g, '&quot;')}" placeholder="${valuePlaceholder(t.type)}">
+        <button id="tBrowse" ${t.type === 'app' || t.type === 'open' ? '' : 'style="display:none"'}>Browse…</button></div>
+      <div class="row"><button class="danger" id="tClear">Clear tile</button></div>
+      <p class="hint">${typeHint(t.type)}</p>
+    </div>`;
+    document.getElementById('tLabel').oninput = e => { t.label = e.target.value; renderTiles(); save(); };
+    document.getElementById('tIcon').oninput = e => { t.icon = e.target.value; renderTiles(); save(); };
+    document.getElementById('tType').onchange = e => { t.type = e.target.value; render(); save(); };
+    document.getElementById('tValue').oninput = e => { t.value = e.target.value; save(); };
+    document.getElementById('tClear').onclick = () => { g.tiles[ti] = { label: '', icon: '', type: '', value: '' }; render(); save(); };
+    const br = document.getElementById('tBrowse');
+    if (br) br.onclick = async () => { const p = await ipcRenderer.invoke('pickProgram'); if (p) { t.value = p; if (!t.label) t.label = p.split(/[\\/]/).pop().replace(/\.(exe|lnk|bat|cmd|com)$/i, ''); if (!t.icon) t.icon = '🚀'; render(); save(); } };
+  }
+  function valuePlaceholder(type) { return type === 'url' ? 'https://…' : type === 'app' ? 'chrome  (or full path)' : type === 'cmd' ? 'start ms-settings:' : type === 'system' ? 'lock  |  config' : ''; }
+  function typeHint(type) {
+    if (type === 'app') return 'Program name on PATH (chrome, notepad…) or a full .exe path via Browse.';
+    if (type === 'url') return 'Opens in your default browser.';
+    if (type === 'cmd') return 'Runs a shell command (advanced).';
+    if (type === 'system') return 'lock = lock screen · config = open this editor.';
+    return '';
+  }
+  function render() { renderGrids(); renderMeta(); renderTiles(); renderForm(); }
+
+  document.getElementById('addGrid').onclick = () => {
+    const g = { id: uid(), name: 'New Grid', cols: 8, rows: 2, tiles: [] }; ensureTiles(g);
+    config.grids.push(g); gi = config.grids.length - 1; ti = -1; render(); save();
+  };
+  (async () => { config = await ipcRenderer.invoke('getConfig'); if (!config.grids) config.grids = []; render(); })();
+</script>
+</body>
+</html>

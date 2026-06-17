@@ -1,0 +1,29 @@
+{
+  "name": "open-quake",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Open driver + multi-grid touchscreen launcher for the DK-QUAKE / ARIS-68 touchscreen-and-knob macro device.",
+  "main": "app/main.js",
+  "scripts": {
+    "start": "electron .",
+    "rebuild": "electron-rebuild -v 23.0.0 -f"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "keywords": [
+    "dk-quake",
+    "aris-68",
+    "decokee",
+    "stream-deck",
+    "macropad",
+    "node-hid",
+    "electron"
+  ],
+  "dependencies": {
+    "node-hid": "^3.3.0",
+    "robotjs": "^0.6.0"
+  },
+  "devDependencies": {
+    "electron": "^23.0.0",
+    "@electron/rebuild": "^3.6.0"
+  }
+}

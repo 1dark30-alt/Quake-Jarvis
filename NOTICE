@@ -1,0 +1,40 @@
+open-quake — licensing notice
+==============================
+
+This repository is split-licensed.
+
+MIT (see ./LICENSE)
+-------------------
+All original work in this repository, including:
+  - app/            the Electron launcher: multi-grid panel, touch/knob handling,
+                    volume + grid-selector logic, and the PC grid editor
+  - tools/          standalone HID probe / write-test scripts
+  - everything not listed under PolyForm below
+
+PolyForm Noncommercial 1.0.0 (see ./src/LICENSE)
+------------------------------------------------
+  - src/Aris68Connector.js   the device driver
+  - docs/DEVICE_PROTOCOL.md   the protocol specification
+
+Why the split
+-------------
+src/Aris68Connector.js encodes the DK-QUAKE / ARIS-68 device communication
+protocol (HID interface IDs, frame format, opcodes, checksum, and the parse
+logic). That protocol was reverse-engineered from DK-Suite V0.4.35. The device
+vendor described the communication protocol as a restricted-for-commercial
+component, with non-commercial use permitted. To respect that without betting on
+how it interacts with the upstream Apache-2.0 release, the driver and its
+protocol notes are released for NONCOMMERCIAL USE ONLY. This may be relaxed to a
+permissive license if explicit written commercial permission is obtained from
+the protocol holders.
+
+The launcher and editor (app/) are wholly original work — they do not derive
+from the DK-Suite renderer — and are MIT-licensed.
+
+What is NOT in this repository
+------------------------------
+No vendor source code, binaries, or API keys are included. The recovered
+DK-Suite source used during reverse-engineering is kept in a separate, private
+location and is not part of this project.
+
+Required Notice: Copyright 2026 TeeJS
