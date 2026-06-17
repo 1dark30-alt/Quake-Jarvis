@@ -1,0 +1,13 @@
+[
+  {
+    "id": "clock",
+    "name": "Flip Clock",
+    "file": "clock.html",
+    "options": [
+      { "key": "mode",    "label": "Mode",          "type": "select", "default": "24",   "choices": [["24", "24-hour"], ["12", "12-hour"]] },
+      { "key": "theme",   "label": "Theme",         "type": "select", "default": "dark", "choices": [["dark", "Dark"], ["classic", "Classic"]] },
+      { "key": "seconds", "label": "Show seconds",  "type": "bool",   "default": false },
+      { "key": "date",    "label": "Show date & day", "type": "bool", "default": true }
+    ]
+  }
+]

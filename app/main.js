@@ -34,6 +34,25 @@ function migrateConfig(c) {
   return c;
 }
 function hostMatches(a, b) { try { return new URL(a).host === new URL(b).host; } catch (e) { return false; } }
+
+// Bundled local apps (apps/apps.json) — name, file, and an options schema the editor renders.
+function loadApps() {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'apps', 'apps.json'), 'utf8')); }
+  catch (e) { console.log('apps manifest load error:', e.message); return []; }
+}
+// Build the file: URL for an app page, encoding its options as a #hash (file:// drops a ?query).
+function appPageUrl(page) {
+  const def = loadApps().find(a => a.id === page.app);
+  if (!def) return 'about:blank';
+  const file = path.join(__dirname, '..', 'apps', def.file);
+  const opts = page.options || {};
+  const hash = (def.options || []).map(o => {
+    let v = (o.key in opts) ? opts[o.key] : o.default;
+    if (o.type === 'bool') v = v ? '1' : '0';
+    return encodeURIComponent(o.key) + '=' + encodeURIComponent(v);
+  }).join('&');
+  return pathToFileURL(file).href + (hash ? '#' + hash : '');
+}
 function saveConfig() { try { fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2)); } catch (e) { console.log('config save error:', e.message); } }
 function activeGrid() { return config.grids.find(g => g.id === config.activeGridId) || config.grids[0] || { cols: 8, rows: 2, tiles: [] }; }
 function gridList() { return config.grids.map(g => ({ id: g.id, name: g.name })); }
@@ -46,6 +65,7 @@ async function pushToPanel() {
 
 // Resolve app/image icons to something the panel renderer can draw (data: URL or file: URL).
 async function resolveGridIcons(grid) {
+  if (grid.kind === 'app') return { ...grid, kind: 'web', url: appPageUrl(grid) };   // render the local app in the webview
   if (grid.kind === 'web') return grid;   // dashboard page — no tiles to resolve
   const tiles = await Promise.all((grid.tiles || []).map(async t => {
     const out = { ...t };
@@ -158,6 +178,7 @@ app.whenReady().then(() => {
   ipcMain.on('switchGrid', (e, id) => { if (config.grids.some(g => g.id === id)) { config.activeGridId = id; saveConfig(); pushToPanel(); } });
   ipcMain.on('openConfig', () => openConfigWindow());
   ipcMain.handle('getConfig', () => config);
+  ipcMain.handle('getApps', () => loadApps());
   ipcMain.on('saveConfigFromEditor', (e, newCfg) => {
     const active = config.activeGridId;                          // the knob owns the live page — editor edits never change it
     config = newCfg;

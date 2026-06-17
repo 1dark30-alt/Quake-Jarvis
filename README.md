@@ -67,7 +67,7 @@ with your PC mouse/keyboard once: the persistent session keeps you signed in.
 ## Editor
 
 Open it from the panel's **Edit Grids** tile (it appears on your PC). The left
-list holds your **pages** — each is a tile **Grid** or a web **Dashboard**.
+list holds your **pages** — each is a tile **Grid**, a web **Dashboard**, or a bundled **App**.
 
 On a grid page you can:
 - **Edit tiles** — label, action (app / URL / shell command / open file / system),
@@ -82,6 +82,21 @@ Edits apply on **Save** — nothing changes on the panel until then. Which page 
 *shown* is controlled by the **knob** (double-click → page selector), not the
 editor, so editing never changes what's live.
 
+## Apps
+
+Bundled local web apps live in `apps/`, listed in `apps/apps.json` (each with a
+name, file, and an options schema). In the editor, **+ App** adds an app page:
+pick the app and set its options — open-quake loads it full-screen on the panel,
+no server and no hand-typed URLs.
+
+Included: **Flip Clock** — split-flap animation, 12/24-hour, dark/classic theme,
+optional seconds, and a corner date/day. (12-hour shows a single hour card with an
+AM/PM badge; 24-hour shows two hour cards.)
+
+Write your own: drop an HTML file in `apps/` that reads its settings from the URL
+**hash** (e.g. `…/myapp.html#color=red`) — a `?query` doesn't survive a `file://`
+load — and add an entry to `apps/apps.json` describing its options.
+
 ## Layout
 
 ```
@@ -93,6 +108,7 @@ app/                      the Electron launcher + PC grid editor     [MIT]
   index.html              the on-panel UI (grids + web dashboards)
   config.html             the PC editor (pages, tiles, icons)
   config.default.json     seed config (copied to config.json on first run)
+apps/                     bundled local web apps + apps.json manifest [MIT]
 ```
 
 ## Build & run (Windows)

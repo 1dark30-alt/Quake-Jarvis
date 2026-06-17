@@ -74,7 +74,7 @@
     <div class="col grids">
       <p class="sectitle">Pages</p>
       <div id="gridlist"></div>
-      <div class="row" style="margin-top:12px; gap:6px"><button class="primary" id="addGrid">+ Grid</button><button id="addDash">+ Dashboard</button></div>
+      <div class="row" style="margin-top:12px; gap:6px; flex-wrap:wrap"><button class="primary" id="addGrid">+ Grid</button><button id="addDash">+ Dashboard</button><button id="addApp">+ App</button></div>
     </div>
     <div class="col editor">
       <div id="gridmeta"></div>
@@ -94,7 +94,7 @@
   const { ipcRenderer } = require('electron');
   const { pathToFileURL } = require('url');
   let config = { activeGridId: null, grids: [] };
-  let gi = 0, ti = -1, selEnd = -1, dragFrom = -1, dirty = false;
+  let gi = 0, ti = -1, selEnd = -1, dragFrom = -1, dirty = false, appDefs = [];
   const appIconCache = {};   // app value -> dataURL | false (failed) | null (in-flight)
   const TYPES = [['', 'Empty'], ['app', 'App / Program'], ['url', 'Website (URL)'], ['cmd', 'Shell command'], ['open', 'Open file/folder'], ['system', 'System (lock/config)']];
   const uid = () => 'g' + Math.random().toString(36).slice(2, 8);
@@ -138,7 +138,7 @@
     config.grids.forEach((g, i) => {
       const d = document.createElement('div');
       d.className = 'gridrow' + (i === gi ? ' active' : '');
-      const tag = g.kind === 'web' ? '🌐' : '▦';
+      const tag = g.kind === 'web' ? '🌐' : g.kind === 'app' ? '🧩' : '▦';
       d.innerHTML = `<span>${tag} ${esc(g.name) || '(unnamed)'}</span>`;
       d.onclick = () => { gi = i; ti = -1; selEnd = -1; render(); };
       el.appendChild(d);
@@ -414,6 +414,56 @@
       hint.innerHTML = 'No authentication — for public pages or anonymous-access dashboards.';
     }
   }
+  // ---- app page ----
+  function renderAppPage() {
+    const g = curGrid();
+    document.getElementById('tilegrid').innerHTML = '';
+    document.getElementById('mergebar').innerHTML = '';
+    document.getElementById('tileform').innerHTML = '';
+    document.getElementById('iconpane').innerHTML = '';
+    const def = appDefs.find(a => a.id === g.app);
+    const el = document.getElementById('gridmeta');
+    el.innerHTML = `
+      <div class="row"><label>Name</label><input id="gName" value="${esc(g.name)}"></div>
+      <div class="row"><label>App</label><select id="gApp">
+        <option value="">— choose an app —</option>
+        ${appDefs.map(a => `<option value="${esc(a.id)}" ${a.id === g.app ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
+      </select></div>
+      <div id="appOpts"></div>
+      <div class="row" style="margin-top:10px"><button class="danger" id="gDelete">Delete page</button></div>
+      <p class="hint">${def ? esc(def.name) + ' runs locally and shows full-screen on the panel.' : 'Pick an app, then set its options below.'}</p>`;
+    document.getElementById('gName').oninput = e => { g.name = e.target.value; renderGrids(); markDirty(); };
+    document.getElementById('gApp').onchange = e => { setApp(g, e.target.value); render(); markDirty(); };
+    document.getElementById('gDelete').onclick = deleteCurrentPage;
+    renderAppOpts(g, def);
+  }
+  function setApp(g, id) {
+    const prev = appDefs.find(a => a.id === g.app);
+    g.app = id;
+    const def = appDefs.find(a => a.id === id);
+    g.options = {};
+    if (def) {
+      def.options.forEach(o => { g.options[o.key] = o.default; });
+      if (!g.name || g.name === 'App' || (prev && g.name === prev.name)) g.name = def.name;  // auto-name from the app
+    }
+  }
+  function renderAppOpts(g, def) {
+    const el = document.getElementById('appOpts'); if (!el) return;
+    if (!def) { el.innerHTML = ''; return; }
+    if (!g.options) g.options = {};
+    el.innerHTML = (def.options || []).map(o => {
+      const v = (o.key in g.options) ? g.options[o.key] : o.default;
+      if (o.type === 'select') return `<div class="row"><label>${esc(o.label)}</label><select class="aopt" data-key="${esc(o.key)}">${o.choices.map(ch => { const val = Array.isArray(ch) ? ch[0] : ch, lab = Array.isArray(ch) ? ch[1] : ch; return `<option value="${esc(val)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(lab)}</option>`; }).join('')}</select></div>`;
+      if (o.type === 'bool') return `<div class="row"><label>${esc(o.label)}</label><input type="checkbox" class="aopt" data-key="${esc(o.key)}" ${v ? 'checked' : ''} style="width:auto"></div>`;
+      return `<div class="row"><label>${esc(o.label)}</label><input class="aopt" data-key="${esc(o.key)}" value="${esc(v)}"></div>`;
+    }).join('');
+    el.querySelectorAll('.aopt').forEach(inp => inp.onchange = e => {
+      const o = (def.options || []).find(x => x.key === e.target.dataset.key);
+      g.options[e.target.dataset.key] = (o && o.type === 'bool') ? e.target.checked : e.target.value;
+      markDirty();
+    });
+  }
+
   function deleteCurrentPage() {
     if (config.grids.length <= 1) return;
     config.grids.splice(gi, 1); gi = 0; ti = -1;
@@ -425,21 +475,28 @@
     renderGrids();
     const g = curGrid();
     if (g && g.kind === 'web') renderDashboard();
+    else if (g && g.kind === 'app') renderAppPage();
     else { renderMeta(); renderTiles(); renderForm(); }
   }
 
   function addPage(kind) {
     let g;
     if (kind === 'web') g = { id: uid(), name: 'Dashboard', kind: 'web', url: '', auth: { type: 'none' } };
+    else if (kind === 'app') g = { id: uid(), name: 'App', kind: 'app', app: '', options: {} };
     else { g = { id: uid(), name: 'New Grid', kind: 'grid', cols: 8, rows: 2, tiles: [] }; ensureTiles(g); }
     config.grids.push(g); gi = config.grids.length - 1; ti = -1; render(); markDirty();
   }
   document.getElementById('addGrid').onclick = () => addPage('grid');
   document.getElementById('addDash').onclick = () => addPage('web');
+  document.getElementById('addApp').onclick = () => addPage('app');
   document.getElementById('saveBtn').onclick = doSave;
   window.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (dirty) doSave(); } });
 
-  (async () => { config = await ipcRenderer.invoke('getConfig'); if (!config.grids) config.grids = []; render(); setState(''); })();
+  (async () => {
+    config = await ipcRenderer.invoke('getConfig'); if (!config.grids) config.grids = [];
+    try { appDefs = await ipcRenderer.invoke('getApps'); } catch (e) {}
+    render(); setState('');
+  })();
 </script>
 </body>
 </html>
