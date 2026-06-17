@@ -18,8 +18,10 @@ It gives you:
 - **Knob control** — rotate for volume (or to scroll the current dashboard),
   single-click to mute, **double-click to open the page selector** (rotate to
   pick a page by name, press to switch).
-- **A PC-side editor** — create grids and dashboards, lay out tiles and their
-  icons (emoji / app icon / image), then **Save** to push to the panel.
+- **A PC-side editor** — build pages of tiles (each opens an app / URL / shell
+  command / file or a system action) with an emoji, app, or image icon; **merge**
+  adjacent tiles into one larger button; **drag-and-drop** to rearrange; then
+  **Save** to push to the panel.
 
 > **Status:** early. Touch, knob, grids, web dashboards, and the editor are
 > working and validated against real hardware. The panel is driven as a normal external
@@ -62,6 +64,24 @@ returns to the page selector. Sessions persist across restarts.
 and use Custom header, or, since the panel runs on your PC, click the login form
 with your PC mouse/keyboard once: the persistent session keeps you signed in.
 
+## Editor
+
+Open it from the panel's **Edit Grids** tile (it appears on your PC). The left
+list holds your **pages** — each is a tile **Grid** or a web **Dashboard**.
+
+On a grid page you can:
+- **Edit tiles** — label, action (app / URL / shell command / open file / system),
+  and icon (emoji, the program's own icon, or a custom image).
+- **Merge** — click a tile, **Shift-click** another to select a block, then **Merge**
+  to show them as one larger button (Unmerge to split).
+- **Rearrange** — **drag-and-drop** to swap tiles; drag a merged block to move it
+  (tiles it lands on slide into the freed cells).
+- **Resize** the grid (columns × rows).
+
+Edits apply on **Save** — nothing changes on the panel until then. Which page is
+*shown* is controlled by the **knob** (double-click → page selector), not the
+editor, so editing never changes what's live.
+
 ## Layout
 
 ```
@@ -97,6 +117,12 @@ the wrong toolset.
 Plug in the DK-QUAKE before `npm start`. The launcher finds the panel display,
 places a borderless window on it, wakes the backlight, and starts listening for
 touch and knob input.
+
+Set the DK-QUAKE's **display orientation to Landscape** in Windows (Settings →
+System → Display) so Windows treats it as a 1920×480 landscape display — that
+keeps the mouse and touch aligned with what you see. open-quake auto-rotates its
+render if you leave it portrait, but then a desktop mouse moved onto the panel
+reads 90° off.
 
 ## Licensing
 
