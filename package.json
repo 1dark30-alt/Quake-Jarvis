@@ -39,7 +39,9 @@
       "**/*",
       "!app/config.json",
       "!docs/**",
-      "!tools/**"
+      "!tools/**",
+      "!sign.js",
+      "!.signing/**"
     ],
     "npmRebuild": false,
     "asarUnpack": [
@@ -51,7 +53,8 @@
         "portable",
         "nsis"
       ],
-      "icon": "app/icon.png"
+      "icon": "app/icon.png",
+      "sign": "./sign.js"
     },
     "portable": {
       "artifactName": "open-quake-${version}-portable.${ext}"
