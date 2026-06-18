@@ -11,6 +11,8 @@ software running.
 
 ### **[⬇ Download for Windows](https://github.com/TeeJS/open-quake/releases/)** &nbsp;·&nbsp; or build from source (below)
 
+> **Switching pages:** the panel shows one page at a time — **double-click the knob** to open the page selector, rotate to highlight a page, then press to switch.
+
 It gives you:
 
 - **A multi-grid launcher** — each page is a grid of tiles; tap a tile to open an
@@ -30,8 +32,9 @@ It gives you:
   adjacent tiles into one larger button; **drag-and-drop** to rearrange; then
   **Save** to push to the panel.
 - **Settings** — choose how the app starts (editor window, minimized, or tray-only),
-  toggle the on-board mic, and tune the knob's ring lighting — from the editor's
-  **⚙ Settings** page. open-quake also lives in the system tray for quick toggles.
+  **auto-rotate** the panel through your pages on a timer, toggle the on-board mic, and
+  tune the knob's ring lighting — from the editor's **⚙ Settings** page. open-quake also
+  lives in the system tray for quick toggles.
 
 > **Status:** early. Touch, knob (incl. the RGB ring), grids, merged buttons, web
 > dashboards, the on-board mic, and the editor are working and validated against real
@@ -142,11 +145,18 @@ in the editor, then set the page's name, URL, and (if the site needs it) auth �
 
 ## Settings & knob lighting
 
-The editor's **⚙ Settings** page (top-right) holds the app- and device-level options:
+The editor's **⚙ Settings** page (top-right) holds the app- and device-level options,
+split into a **Software** tab (on launch, screen rotation) and a **Hardware** tab (knob
+ring, microphone):
 
 - **On launch** — open the editor window, start **minimized** to the taskbar, or run
   **tray-only** (panel + system tray, no window). open-quake always sits in the system
   tray with quick toggles (mic, knob ring, re-place panel on the device).
+- **Screen rotation** — auto-cycle the panel through chosen pages on a timer. Turn it on,
+  set the interval (5–3600 s), and pick which **categories** to include (grids, dashboards,
+  apps); then tick **Include in rotation** on each page you want in the loop (a page rotates
+  only when both its category and its own box are checked). Start or pause it any time from
+  the knob's page selector (double-click) or the tray menu.
 - **Knob ring** — the RGB ring around the knob. Pick an **effect** (the 44 QMK
   RGB-matrix modes, or *All Off* to turn it off), a **color**, **brightness**, and
   **effect speed**. Changes apply to the ring **instantly**; **Save to device** writes

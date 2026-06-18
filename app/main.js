@@ -19,6 +19,8 @@ const DEFAULT_SETTINGS = { launchMode: 'editor', micOnLaunch: false, lighting: O
 let firstRun = false;     // set by loadConfig when there was no prior config (fresh install)
 let micState = false;     // current device mic state (LED follows it)
 let lastRingEffect = LED_DEFAULT.effect; // remembered so the tray on/off toggle can restore the prior effect
+let rotateRunning = false;               // screen-rotation runtime on/off (starts per settings on launch)
+let rotTimer = null;
 let config = loadConfig();
 let panelWin = null, configWin = null, tray = null;
 const dev = new Aris68Connector({ hid: HID });
@@ -74,6 +76,7 @@ async function pushToPanel() {
   if (panelWin && !panelWin.isDestroyed()) {
     panelWin.webContents.send('grid', await resolveGridIcons(activeGrid()));
     panelWin.webContents.send('gridList', { grids: gridList(), activeId: config.activeGridId });
+    pushRotationState();
   }
 }
 
@@ -185,19 +188,62 @@ function toggleKnobRing() {
   saveConfig(); applyKnobSettings(); refreshTray();
 }
 
+// ---- screen rotation (auto-cycle pages) ----
+function rotationCfg() {
+  const r = (config.settings && config.settings.rotation) || {};
+  return {
+    enabled: !!r.enabled,
+    interval: Math.max(5, Math.min(3600, parseInt(r.interval, 10) || 30)),
+    cats: Object.assign({ grids: false, dashboards: false, apps: false }, r.cats || {}),
+  };
+}
+function pageCategory(g) { return g.kind === 'web' ? 'dashboards' : g.kind === 'app' ? 'apps' : 'grids'; }
+function rotationList() { const c = rotationCfg(); return config.grids.filter(g => g.rotate && c.cats[pageCategory(g)]); }
+function gotoGrid(id, persist) {
+  if (!config.grids.some(g => g.id === id)) return;
+  config.activeGridId = id; if (persist) saveConfig(); pushToPanel();
+}
+function rotateTick() {
+  const ids = rotationList().map(g => g.id);
+  if (ids.length < 2) return;                                  // nothing to cycle through
+  gotoGrid(ids[(ids.indexOf(config.activeGridId) + 1) % ids.length], false);   // active not in list (-1) -> first
+}
+function scheduleRotation() {
+  if (rotTimer) { clearTimeout(rotTimer); rotTimer = null; }
+  if (!rotateRunning) return;
+  rotTimer = setTimeout(() => { rotateTick(); scheduleRotation(); }, rotationCfg().interval * 1000);
+}
+function pushRotationState() {
+  if (panelWin && !panelWin.isDestroyed()) panelWin.webContents.send('rotation', { enabled: rotationCfg().enabled, running: rotateRunning });
+}
+function setRotation(on) { rotateRunning = !!on && rotationCfg().enabled; scheduleRotation(); refreshTray(); pushRotationState(); }
+function toggleRotation() { setRotation(!rotateRunning); }
+// Re-evaluate after a settings change: a fresh off->on starts it, off stops it, on->on keeps the runtime state
+// (so a manual pause survives an unrelated save). interval/page changes are picked up by the (re)schedule.
+function applyRotationSettings(wasEnabled) {
+  const enabled = rotationCfg().enabled;
+  if (!enabled) rotateRunning = false;
+  else if (!wasEnabled) rotateRunning = true;
+  scheduleRotation(); refreshTray(); pushRotationState();
+}
+
 // Tray icon — the app's desktop presence (the panel window deliberately skips the taskbar).
 function trayMenu() {
   const ringOn = lighting().effect !== 0;
-  return Menu.buildFromTemplate([
+  const items = [
     { label: 'open-quake', enabled: false },
     { type: 'separator' },
     { label: 'Open editor', click: () => openConfigWindow() },
     { label: micState ? 'Mic: on — click to disable' : 'Mic: off — click to enable', click: () => toggleMic() },
     { label: ringOn ? 'Knob ring: on — click to turn off' : 'Knob ring: off — click to turn on', click: () => toggleKnobRing() },
+  ];
+  if (rotationCfg().enabled) items.push({ label: rotateRunning ? 'Auto-rotate: on — click to pause' : 'Auto-rotate: off — click to start', click: () => toggleRotation() });
+  items.push(
     { label: 'Re-place panel on device', click: () => { try { dev.screenOn(); } catch (e) {} placePanel(); } },
     { type: 'separator' },
     { label: 'Quit', click: () => { try { dev.stop(); } catch (e) {} app.quit(); } },
-  ]);
+  );
+  return Menu.buildFromTemplate(items);
 }
 function refreshTray() { if (tray) tray.setContextMenu(trayMenu()); }
 function createTray() {
@@ -251,16 +297,19 @@ app.whenReady().then(() => {
 
   ipcMain.on('launch', (e, a) => runAction(a));
   ipcMain.on('volume', (e, v) => { if (robot) { try { if (v === 'mute') robot.keyTap('audio_mute'); else robot.keyTap(v > 0 ? 'audio_vol_up' : 'audio_vol_down'); } catch (er) {} } });
-  ipcMain.on('switchGrid', (e, id) => { if (config.grids.some(g => g.id === id)) { config.activeGridId = id; saveConfig(); pushToPanel(); } });
+  ipcMain.on('switchGrid', (e, id) => { gotoGrid(id, true); if (rotateRunning) scheduleRotation(); });   // a manual pick resets the rotation timer
+  ipcMain.on('toggleRotation', () => toggleRotation());
   ipcMain.on('openConfig', () => openConfigWindow());
+  ipcMain.on('openExternal', (e, url) => { try { if (typeof url === 'string' && /^https?:/i.test(url)) shell.openExternal(url); } catch (er) {} });
   ipcMain.handle('getConfig', () => config);
   ipcMain.handle('getApps', () => loadApps());
   ipcMain.on('saveConfigFromEditor', (e, newCfg) => {
     const active = config.activeGridId;                          // the knob owns the live page — editor edits never change it
+    const wasRot = rotationCfg().enabled;                        // detect a fresh off->on to auto-start (else keep the runtime pause)
     config = newCfg;
     if (config.grids.some(g => g.id === active)) config.activeGridId = active;
     else if (!config.grids.some(g => g.id === config.activeGridId)) config.activeGridId = (config.grids[0] || {}).id || null;
-    saveConfig(); pushToPanel(); applyKnobSettings(); refreshTray();
+    saveConfig(); pushToPanel(); applyKnobSettings(); refreshTray(); applyRotationSettings(wasRot);
   });
   ipcMain.handle('pickProgram', async () => {
     const r = await dialog.showOpenDialog(configWin, { properties: ['openFile'], filters: [{ name: 'Programs', extensions: ['exe', 'lnk', 'bat', 'cmd', 'com'] }, { name: 'All Files', extensions: ['*'] }] });
@@ -296,6 +345,7 @@ app.whenReady().then(() => {
   ipcMain.handle('saveLightingToDevice', () => { try { return dev.saveLighting(); } catch (e) { return false; } });
 
   placePanel();
+  if (rotationCfg().enabled) setRotation(true);          // auto-start cycling on launch when enabled
   const ls = appSettings();
   if (firstRun || ls.launchMode === 'editor') openConfigWindow();
   else if (ls.launchMode === 'minimized') { openConfigWindow(); if (configWin && !configWin.isDestroyed()) configWin.minimize(); }
