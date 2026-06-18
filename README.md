@@ -9,7 +9,7 @@ software running.
 
 *From top: the grid launcher · a merged-tile Media grid · the flip-clock app · a [Windy](https://www.windy.com) weather map and a [Home Assistant](https://www.home-assistant.io) dashboard — each with the knob's RGB ring lit a different color.*
 
-### **[⬇ Download for Windows](https://github.com/TeeJS/open-quake/releases/latest)** &nbsp;·&nbsp; or build from source (below)
+### **[⬇ Download for Windows](https://github.com/TeeJS/open-quake/releases/)** &nbsp;·&nbsp; or build from source (below)
 
 It gives you:
 
