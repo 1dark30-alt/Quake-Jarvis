@@ -21,3 +21,9 @@ npm-debug.log*
 Thumbs.db
 .vscode/
 .idea/
+
+# timestamped/.old backups of files (never committed)
+*.old
+
+# scratch handoff / homework notes (kept local, not part of the repo)
+*-HANDOFF.md
