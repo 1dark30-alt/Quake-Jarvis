@@ -77,6 +77,7 @@ async function pushToPanel() {
     panelWin.webContents.send('grid', await resolveGridIcons(activeGrid()));
     panelWin.webContents.send('gridList', { grids: gridList(), activeId: config.activeGridId });
     pushRotationState();
+    if (!config.introShown) panelWin.webContents.send('intro');   // one-time "double-click the knob" overlay
   }
 }
 
@@ -313,6 +314,7 @@ app.whenReady().then(() => {
   ipcMain.on('switchGrid', (e, id) => { gotoGrid(id, true); if (rotateRunning) scheduleRotation(); });   // a manual pick resets the rotation timer
   ipcMain.on('toggleRotation', () => toggleRotation());
   ipcMain.on('openConfig', () => openConfigWindow());
+  ipcMain.on('introDone', () => { config.introShown = true; saveConfig(); });   // remember the intro was dismissed
   ipcMain.on('openExternal', (e, url) => { try { if (typeof url === 'string' && /^https?:/i.test(url)) shell.openExternal(url); } catch (er) {} });
   ipcMain.handle('getConfig', () => config);
   ipcMain.handle('getApps', () => loadApps());

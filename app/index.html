@@ -39,6 +39,17 @@
     font-size: 34px; color: #5f7790; transform: translateY(-50%); }
   .selitem.sel { font-size: 52px; font-weight: 800; color: #fff; text-shadow: 0 0 22px rgba(124,255,178,.6); }
   .selhint { margin-top: 10px; font-size: 20px; color: #6b809a; }
+  /* first-run intro overlay */
+  #intro { position: absolute; inset: 0; background: rgba(3,6,10,.96); display: none; z-index: 20;
+    flex-direction: column; align-items: center; justify-content: center; color: #e8eef6; }
+  #intro.open { display: flex; }
+  .introicon { font-size: 84px; line-height: 1; margin-bottom: 4px; }
+  .introtitle { font-size: 44px; font-weight: 800; color: #fff; text-align: center; padding: 0 40px;
+    text-shadow: 0 0 22px rgba(124,255,178,.5); }
+  .introsub { font-size: 23px; color: #9fb3c8; margin-top: 12px; text-align: center; padding: 0 60px; }
+  .introok { margin-top: 24px; font-size: 30px; font-weight: 700; color: #04121f; background: #7CFFB2;
+    border: none; border-radius: 14px; padding: 13px 64px; cursor: pointer; box-shadow: 0 0 28px rgba(124,255,178,.45); }
+  .introok:active { transform: scale(.96); }
 </style>
 </head>
 <body>
@@ -47,13 +58,20 @@
     <webview id="web" src="about:blank" partition="persist:dashboards"></webview>
     <div id="vol">🔊</div>
     <div id="selector"><div class="seltitle">SELECT PAGE</div><div class="selwheel"><div id="selitems"></div></div><div class="selhint">rotate to choose · press to select</div></div>
+    <div id="intro">
+      <div class="introicon">🔘</div>
+      <div class="introtitle">Double-click the knob to switch pages</div>
+      <div class="introsub">Use it any time to move between your launcher, dashboards, and apps.</div>
+      <button class="introok" id="introok">OK</button>
+    </div>
   </div>
 <script>
   const { ipcRenderer } = require('electron');
   const grid = document.getElementById('grid'), vol = document.getElementById('vol'), web = document.getElementById('web');
   const selector = document.getElementById('selector'), selitems = document.getElementById('selitems');
+  const intro = document.getElementById('intro'), introok = document.getElementById('introok');
   let cfg = { cols: 8, rows: 2, tiles: [] };
-  let grids = [], activeId = null, rotEnabled = false, rotRunning = false;
+  let grids = [], activeId = null, rotEnabled = false, rotRunning = false, introOpen = false;
   let armed = false, idleT = null, lastHit = -1, volT = null;
   let selOpen = false, selIdx = 0, selAutoClose = null;
   let webMode = false, curUrl = '', webReady = false, webDown = false, lastWeb = { x: 0, y: 0 }, webIdle = null;
@@ -147,6 +165,11 @@
   ipcRenderer.on('gridList', (e, d) => { grids = d.grids; activeId = d.activeId; if (selOpen) renderWheel(); });
   ipcRenderer.on('rotation', (e, r) => { rotEnabled = !!r.enabled; rotRunning = !!r.running; if (selOpen) renderWheel(); });
 
+  // ---- first-run intro overlay (one-time "double-click the knob" hint) ----
+  ipcRenderer.on('intro', () => { if (introOpen) return; introOpen = true; intro.classList.add('open'); });
+  function dismissIntro() { if (!introOpen) return; introOpen = false; intro.classList.remove('open'); ipcRenderer.send('introDone'); }
+  introok.addEventListener('click', dismissIntro);   // PC mouse
+
   // ---- touch -> launch ----
   function tileAt(sx, sy) {
     const col = Math.floor(sx / (1920 / cfg.cols)), row = Math.floor(sy / (480 / cfg.rows));
@@ -163,6 +186,7 @@
     lastHit = i;
   }
   ipcRenderer.on('touch', (e, pts) => {
+    if (introOpen) { if (pts.some(p => p.action === 1)) dismissIntro(); return; }   // any tap dismisses the intro
     if (selOpen) return; // ignore touch while picking a page
     const p = pts.find(p => p.action === 1) || pts[0]; if (!p) return;
     if (webMode) return webTouch(p);        // dashboard: forward as mouse to the webview
@@ -238,6 +262,10 @@
   // ---- knob ----
   // The knob does click-type detection in hardware: press index 1 = single-click, 2 = double-click.
   ipcRenderer.on('knob', (e, k) => {
+    if (introOpen) {   // teach by doing: a double-click clears the intro and opens the page menu; ignore other knob input
+      if (k.type === 'press' && k.index === 2) { dismissIntro(); openSelector(); }
+      return;
+    }
     if (k.type === 'rotate') {
       if (selOpen) { moveSelector(k.dir > 0 ? -1 : 1); }                  // CW scrolls down the list
       else if (webMode && webReady) {
