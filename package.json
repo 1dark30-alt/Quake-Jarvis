@@ -9,9 +9,10 @@
     "node": ">=18 <25"
   },
   "scripts": {
-    "start": "electron .",
+    "start": "node build-smtc.js && electron .",
     "rebuild": "electron-rebuild -v 23.0.0 -f",
-    "dist": "electron-builder --win"
+    "build:smtc": "node build-smtc.js",
+    "dist": "node build-smtc.js && electron-builder --win"
   },
   "license": "SEE LICENSE IN LICENSE",
   "keywords": [
@@ -44,12 +45,15 @@
       "!app/config.json",
       "!docs/**",
       "!tools/**",
+      "!native/**",
+      "!build-smtc.js",
       "!sign.js",
       "!.signing/**"
     ],
     "npmRebuild": false,
     "asarUnpack": [
       "apps/**/*",
+      "app/native/**",
       "**/*.node"
     ],
     "win": {
