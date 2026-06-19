@@ -39,6 +39,16 @@ function findSignTool() {
   return fs.existsSync(direct) ? direct : null;
 }
 
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function waitUnlocked(file, timeoutMs = 10000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try { const fd = fs.openSync(file, 'r+'); fs.closeSync(fd); return; } catch (e) {}
+    await sleep(500);
+  }
+}
+
 exports.default = async function (configuration) {
   const file = configuration.path;
   if (!file) return;
@@ -52,5 +62,15 @@ exports.default = async function (configuration) {
     AZURE_TENANT_ID: TENANT,
     PATH: PWSH_DIR + path.delimiter + (process.env.PATH || ''),
   });
-  execFileSync(signtool, ['sign', '/v', '/fd', 'SHA256', '/tr', TIMESTAMP, '/td', 'SHA256', '/dlib', DLIB, '/dmdf', META, file], { stdio: 'inherit', env });
+  await waitUnlocked(file);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      execFileSync(signtool, ['sign', '/v', '/fd', 'SHA256', '/tr', TIMESTAMP, '/td', 'SHA256', '/dlib', DLIB, '/dmdf', META, file], { stdio: 'inherit', env });
+      return;
+    } catch (e) {
+      if (attempt === 3) throw e;
+      console.warn(`  ⚠ signtool failed (attempt ${attempt}), retrying in 2s…`);
+      await sleep(2000);
+    }
+  }
 };
