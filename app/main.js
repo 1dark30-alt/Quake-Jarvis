@@ -226,6 +226,21 @@ function fetchIconToCache(url) {
     req.end();
   });
 }
+
+// On launch, delete cached URL-icon files that no tile references any more (orphaned when a tile's URL
+// changed, the tile was deleted, or its icon type switched away from 'url'). Keyed by filename
+// (sha1(url)), so a cache file shared by several tiles with the same URL is kept while ANY tile uses it.
+function sweepIconCache() {
+  let files;
+  try { files = fs.readdirSync(ICON_CACHE_DIR); } catch (e) { return; }   // no cache dir yet -> nothing to sweep
+  const used = new Set();
+  for (const g of (config.grids || [])) for (const t of (g.tiles || [])) {
+    if (t && t.iconType === 'url' && t.iconCache) used.add(path.basename(t.iconCache));
+  }
+  let removed = 0;
+  for (const f of files) { if (!used.has(f)) { try { fs.unlinkSync(path.join(ICON_CACHE_DIR, f)); removed++; } catch (e) {} } }
+  if (removed) console.log('icon cache: removed ' + removed + ' orphaned file(s)');
+}
 // Resolve app/image icons to a data: URL the panel renderer can draw (works in native + http pages).
 async function resolveGridIcons(grid) {
   if (grid.kind === 'app') return { ...grid, kind: 'web', url: appPageUrl(grid) };   // render the local app in the webview
@@ -452,6 +467,7 @@ app.whenReady().then(async () => {
     ensureSystemViewPage(serverPort); ensureMusicPage();
     console.log('SystemView + Music on http://127.0.0.1:' + serverPort);
   } catch (e) { console.log('local panel services failed to start:', e.message); }
+  sweepIconCache();   // clean up orphaned URL-icon cache files left by prior sessions
 
   // Dashboard auth injection for the webview session. The active page's auth config drives it:
   //  - 'header'  -> add custom header(s) to requests to the dashboard host (bearer / Cloudflare Access / …)
