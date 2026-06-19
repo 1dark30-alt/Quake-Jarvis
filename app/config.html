@@ -27,6 +27,9 @@
   input, select { background: #0e141c; color: #dbe5f0; border: 1px solid #2a3a4e; border-radius: 6px; padding: 7px 9px; font-size: 13px; width: 100%; }
   .row { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
   .row label { width: 70px; color: #91a4ba; font-size: 13px; flex: none; }
+  .secretwrap { display: flex; gap: 6px; align-items: stretch; flex: 1; min-width: 0; }
+  .secretwrap input { flex: 1; min-width: 0; width: auto; }
+  .reveal { flex: none; width: 34px; padding: 0; font-size: 14px; line-height: 1; }
   .tilegrid { display: grid; gap: 8px; margin: 10px 0 12px; }
   .cell { border-radius: 12px; background: #141d29; border: 1px solid #233246; cursor: pointer; user-select: none;
     display: flex; flex-direction: column; align-items: center; justify-content: center; color: #bcd; overflow: hidden; }
@@ -122,6 +125,22 @@
   const uid = () => 'g' + Math.random().toString(36).slice(2, 8);
   const curGrid = () => config.grids[gi];
   const esc = s => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // A masked credential field: a password input + an eyeball to reveal it. attrs = extra input HTML
+  // (id / class / data-* / placeholder); wrapStyle = optional style on the wrapper (e.g. a flex weight).
+  // RULE: every password / API key / token / secret in the editor goes through this — shown as ••••
+  // with an opt-in reveal, never plain text. (See secretInput note in apps.json: option type "secret".)
+  function secretInput(value, attrs, wrapStyle) {
+    return `<span class="secretwrap"${wrapStyle ? ` style="${wrapStyle}"` : ''}>`
+      + `<input type="password" value="${esc(value)}" ${attrs || ''}>`
+      + `<button type="button" class="reveal" tabindex="-1" title="Show / hide">👁</button></span>`;
+  }
+  // One-time delegated handler: an eyeball click toggles its field between hidden (••••) and visible.
+  document.addEventListener('click', e => {
+    const b = e.target.closest && e.target.closest('.reveal'); if (!b) return;
+    const inp = b.parentElement && b.parentElement.querySelector('input'); if (!inp) return;
+    const show = inp.type === 'password'; inp.type = show ? 'text' : 'password';
+    b.textContent = show ? '🙈' : '👁';
+  });
   const fileUrl = p => { try { return pathToFileURL(p).href; } catch (e) { return ''; } };
   const baseName = p => p.split(/[\\/]/).pop().replace(/\.(exe|lnk|bat|cmd|com)$/i, '');
   const iconTypeOf = t => t.iconType || 'emoji';
@@ -443,17 +462,17 @@
     const el = document.getElementById('authFields'), hint = document.getElementById('authHint');
     const t = g.auth.type;
     if (t === 'ha') {
-      el.innerHTML = `<div class="row"><label>Token</label><input id="aTok" type="password" value="${esc(g.auth.token)}" placeholder="long-lived access token"></div>`;
+      el.innerHTML = `<div class="row"><label>Token</label>${secretInput(g.auth.token, 'id="aTok" placeholder="long-lived access token"')}</div>`;
       document.getElementById('aTok').oninput = e => { g.auth.token = e.target.value; markDirty(); };
       hint.innerHTML = '<b>Home Assistant</b> (no keyboard on the panel): profile → Security → Long-Lived Access Tokens → Create, paste above. The panel signs in automatically.';
     } else if (t === 'basic') {
       el.innerHTML = `<div class="row"><label>User</label><input id="aUser" value="${esc(g.auth.user)}"></div>
-        <div class="row"><label>Password</label><input id="aPass" type="password" value="${esc(g.auth.pass)}"></div>`;
+        <div class="row"><label>Password</label>${secretInput(g.auth.pass, 'id="aPass"')}</div>`;
       document.getElementById('aUser').oninput = e => { g.auth.user = e.target.value; markDirty(); };
       document.getElementById('aPass').oninput = e => { g.auth.pass = e.target.value; markDirty(); };
       hint.innerHTML = 'Sent as an HTTP Basic Auth header to the dashboard host (common behind nginx / a reverse proxy).';
     } else if (t === 'header') {
-      el.innerHTML = g.auth.headers.map((h, i) => `<div class="row"><input class="aHN" data-i="${i}" value="${esc(h.name)}" placeholder="Header name" style="flex:2"><input class="aHV" data-i="${i}" type="password" value="${esc(h.value)}" placeholder="value" style="flex:3"><button class="aHD" data-i="${i}" title="remove">✕</button></div>`).join('')
+      el.innerHTML = g.auth.headers.map((h, i) => `<div class="row"><input class="aHN" data-i="${i}" value="${esc(h.name)}" placeholder="Header name" style="flex:2">${secretInput(h.value, `class="aHV" data-i="${i}" placeholder="value"`, 'flex:3')}<button class="aHD" data-i="${i}" title="remove">✕</button></div>`).join('')
         + `<div class="row"><button id="aHAdd">+ header</button></div>`;
       el.querySelectorAll('.aHN').forEach(x => x.oninput = e => { g.auth.headers[+e.target.dataset.i].name = e.target.value; markDirty(); });
       el.querySelectorAll('.aHV').forEach(x => x.oninput = e => { g.auth.headers[+e.target.dataset.i].value = e.target.value; markDirty(); });
@@ -510,6 +529,7 @@
       const v = (o.key in g.options) ? g.options[o.key] : o.default;
       if (o.type === 'select') return `<div class="row"><label>${esc(o.label)}</label><select class="aopt" data-key="${esc(o.key)}">${o.choices.map(ch => { const val = Array.isArray(ch) ? ch[0] : ch, lab = Array.isArray(ch) ? ch[1] : ch; return `<option value="${esc(val)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(lab)}</option>`; }).join('')}</select></div>`;
       if (o.type === 'bool') return `<div class="row"><label>${esc(o.label)}</label><input type="checkbox" class="aopt" data-key="${esc(o.key)}" ${v ? 'checked' : ''} style="width:auto"></div>`;
+      if (o.type === 'secret') return `<div class="row"><label>${esc(o.label)}</label>${secretInput(v, `class="aopt" data-key="${esc(o.key)}"`)}</div>`;
       return `<div class="row"><label>${esc(o.label)}</label><input class="aopt" data-key="${esc(o.key)}" value="${esc(v)}"></div>`;
     }).join('');
     el.querySelectorAll('.aopt').forEach(inp => inp.onchange = e => {

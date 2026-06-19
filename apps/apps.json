@@ -34,7 +34,7 @@
     "served": true,
     "options": [
       { "key": "endpoint", "label": "Open WebUI chat URL (…/api/chat/completions)", "type": "text", "default": "" },
-      { "key": "api_key",  "label": "API key",                                       "type": "text", "default": "" },
+      { "key": "api_key",  "label": "API key",                                       "type": "secret", "default": "" },
       { "key": "model",    "label": "Model (optional, e.g. llama3.2)",               "type": "text", "default": "" }
     ]
   }
