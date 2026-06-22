@@ -8,7 +8,7 @@ const { exec } = require('child_process');
 const { pathToFileURL } = require('url');
 const HID = require('node-hid');
 const Aris68Connector = require(path.join(__dirname, '..', 'src', 'Aris68Connector'));
-let robot = null; try { robot = require('robotjs'); } catch (e) { console.log('robotjs unavailable (knob-volume off):', e.message); }
+let robot = null; try { robot = require('@jitsi/robotjs'); } catch (e) { console.log('robotjs unavailable (knob-volume off):', e.message); }
 
 const USER_DIR = app.getPath('userData');
 const CONFIG_PATH = path.join(USER_DIR, 'config.json');                  // writable — works inside a packaged app too

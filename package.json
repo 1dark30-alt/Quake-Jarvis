@@ -9,7 +9,6 @@
     "node": ">=18 <25"
   },
   "scripts": {
-    "postinstall": "patch-package",
     "start": "node build-smtc.js && electron .",
     "rebuild": "electron-rebuild -v 23.0.0 -f",
     "build:smtc": "node build-smtc.js",
@@ -26,16 +25,14 @@
     "electron"
   ],
   "dependencies": {
+    "@jitsi/robotjs": "^0.6.22",
     "node-hid": "^3.3.0",
-    "robotjs": "^0.6.0",
     "systeminformation": "^5.31.7"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.6.0",
     "electron": "^23.0.0",
-    "electron-builder": "^24.13.3",
-    "patch-package": "^8.0.1",
-    "postinstall-postinstall": "^2.1.0"
+    "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "com.teejs.openquake",
