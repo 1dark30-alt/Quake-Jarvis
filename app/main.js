@@ -435,7 +435,7 @@ function monitorKnob(k) {
   const m = monitorCfg();
   try {
     if (k.type === 'rotate') {
-      if (m.knobTurn === 'scroll') robot.scrollMouse(0, k.dir > 0 ? -120 : 120);   // 120 = one wheel notch per detent (needs the patched robotjs — see patches/)
+      if (m.knobTurn === 'scroll') robot.scrollMouse(0, k.dir > 0 ? -120 : 120);   // 120 = one wheel notch per detent (@jitsi/robotjs fixes the Windows scroll natively)
       else robot.keyTap(k.dir > 0 ? 'audio_vol_up' : 'audio_vol_down');
     } else if (k.type === 'press' && k.index === 1) {                          // single-tap action
       if (m.knobTap === 'leftclick') robot.mouseClick('left');
@@ -467,6 +467,22 @@ function openConfigWindow() {
     ]);
     menu.popup({ window: configWin });
   });
+}
+
+// About dialog — version + runtime, with a link out to the repo.
+function showAbout() {
+  const parent = (configWin && !configWin.isDestroyed()) ? configWin : null;
+  dialog.showMessageBox(parent, {
+    type: 'info',
+    title: 'About open-quake',
+    message: 'open-quake v' + app.getVersion(),
+    detail: 'Open driver + touchscreen launcher for the DK-QUAKE / ARIS-68.\n\n'
+      + 'Electron ' + process.versions.electron + '  ·  Chromium ' + process.versions.chrome + '\n\n'
+      + 'Independent community project — not affiliated with or endorsed by DECOKEE.\n'
+      + 'github.com/TeeJS/open-quake',
+    buttons: ['Close', 'Open GitHub'],
+    defaultId: 0, cancelId: 0, noLink: true,
+  }).then(r => { if (r.response === 1) { try { shell.openExternal('https://github.com/TeeJS/open-quake'); } catch (e) {} } }).catch(() => {});
 }
 
 // ---- device settings (knob RGB ring, mic) ----
@@ -533,7 +549,7 @@ function applyRotationSettings(wasEnabled) {
 function trayMenu() {
   const ringOn = lighting().effect !== 0;
   const items = [
-    { label: 'open-quake', enabled: false },
+    { label: 'open-quake v' + app.getVersion(), enabled: false },
     { type: 'separator' },
     { label: 'Open editor', click: () => openConfigWindow() },
     { label: micState ? 'Mic: on — click to disable' : 'Mic: off — click to enable', click: () => toggleMic() },
@@ -544,6 +560,7 @@ function trayMenu() {
     { label: monitorMode ? 'Monitor mode: on — click to return to panel' : 'Switch to monitor mode (use device as a normal monitor)', click: () => toggleMonitorMode() },
     { label: 'Re-place panel on device', enabled: !monitorMode, click: () => { try { dev.screenOn(); } catch (e) {} placePanel(); } },
     { type: 'separator' },
+    { label: 'About open-quake', click: () => showAbout() },
     { label: 'Quit', click: () => { try { dev.stop(); } catch (e) {} app.quit(); } },
   );
   return Menu.buildFromTemplate(items);
@@ -629,6 +646,7 @@ app.whenReady().then(async () => {
   ipcMain.on('openExternal', (e, url) => { try { if (typeof url === 'string' && /^https?:/i.test(url)) shell.openExternal(url); } catch (er) {} });
   ipcMain.handle('getConfig', () => config);
   ipcMain.handle('getApps', () => loadApps());
+  ipcMain.handle('getVersion', () => app.getVersion());
   ipcMain.on('saveConfigFromEditor', (e, newCfg) => {
     const active = config.activeGridId;                          // the knob owns the live page — editor edits never change it
     const wasRot = rotationCfg().enabled;                        // detect a fresh off->on to auto-start (else keep the runtime pause)

@@ -670,12 +670,14 @@
         <button id="tabMon" class="${tab === 'monitor' ? 'primary' : ''}">Monitor</button>
       </div>
       ${tab === 'software' ? swHtml : tab === 'hardware' ? hwHtml : monHtml}
-      <div class="row" style="margin-top:22px"><button id="sBack">← Back to pages</button></div>`;
+      <div class="row" style="margin-top:22px"><button id="sBack">← Back to pages</button></div>
+      <p class="hint" id="appVer" style="margin-top:20px; text-align:center; opacity:.55">open-quake</p>`;
 
     document.getElementById('tabSw').onclick = () => { settingsTab = 'software'; renderSettings(); };
     document.getElementById('tabHw').onclick = () => { settingsTab = 'hardware'; renderSettings(); };
     document.getElementById('tabMon').onclick = () => { settingsTab = 'monitor'; renderSettings(); };
     document.getElementById('sBack').onclick = () => { view = 'pages'; render(); };
+    ipcRenderer.invoke('getVersion').then(v => { const e = document.getElementById('appVer'); if (e && v) e.textContent = 'open-quake v' + v; }).catch(() => {});
     const setS = (k, v) => { if (!config.settings) config.settings = {}; config.settings[k] = v; markDirty(); };
 
     if (tab === 'software') {
