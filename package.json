@@ -64,7 +64,9 @@
         "nsis"
       ],
       "icon": "app/icon.png",
-      "sign": "./sign.js"
+      "signtoolOptions": {
+        "sign": "./sign.js"
+      }
     },
     "portable": {
       "artifactName": "open-quake-${version}-portable.${ext}"
