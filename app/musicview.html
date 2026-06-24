@@ -6,8 +6,12 @@
 <title>Music</title>
 <style>
   * { box-sizing: border-box; }
+  :root { --bg:#05080d; --fg:#e8eef6; --muted:#9fb3c8; --dim:#7e93ab; --surf1:#11202e; --surf2:#0a1119;
+    --tile-bd:#1a2738; --pill:#16202e; --accent:#7CFFB2; }
+  body.light { --bg:#eef3f8; --fg:#1c2a39; --muted:#5a6c7e; --dim:#6a7b8c; --surf1:#ffffff; --surf2:#f1f5f9;
+    --tile-bd:#d2dce6; --pill:#e2e9f0; }
   html, body { margin: 0; width: 100%; height: 100%; }
-  body { background: #05080d; color: #e8eef6; overflow: hidden; user-select: none;
+  body { background: var(--bg); color: var(--fg); overflow: hidden; user-select: none;
     font-family: "Segoe UI", system-ui, sans-serif; }
   /* rule-of-thirds: art anchored left edge | now-playing + transport fill the middle band | grid anchored right edge */
   #wrap { display: flex; width: 100vw; height: 100vh; padding: 26px; align-items: stretch; }
@@ -17,34 +21,37 @@
 
   /* album art: the 🎵 note shows until the SMTC .NET helper supplies cover art (then artImg covers it) */
   .art { height: 100%; aspect-ratio: 1/1; border-radius: 18px; position: relative; overflow: hidden;
-    background: linear-gradient(160deg, #11202e, #0a1119); border: 1px solid #1a2738;
+    background: linear-gradient(160deg, var(--surf1), var(--surf2)); border: 1px solid var(--tile-bd);
     display: flex; align-items: center; justify-content: center; }
   .art .note { font-size: 150px; opacity: .22; }
   .art img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: none; }
 
   .title { font-size: 52px; font-weight: 800; line-height: 1.12; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .artist { font-size: 32px; color: #9fb3c8; margin-top: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .status { display: flex; align-items: center; gap: 12px; margin-top: 26px; font-size: 19px; color: #7e93ab; }
-  .status .pill { padding: 4px 14px; border-radius: 20px; background: #16202e; color: #7CFFB2; font-weight: 700; letter-spacing: .5px; }
+  .artist { font-size: 32px; color: var(--muted); margin-top: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .status { display: flex; align-items: center; gap: 12px; margin-top: 26px; font-size: 19px; color: var(--dim); }
+  .status .pill { padding: 4px 14px; border-radius: 20px; background: var(--pill);
+    color: var(--accent); font-weight: 700; letter-spacing: .5px; }
   .controls { display: flex; align-items: center; justify-content: space-between; }
-  .btn { width: 92px; height: 92px; border-radius: 50%; border: 1px solid #243345; cursor: pointer; color: #e8eef6;
-    background: linear-gradient(160deg, #101a26, #0a1119); display: flex; align-items: center; justify-content: center;
+  .btn { width: 92px; height: 92px; border-radius: 50%; border: 1px solid var(--tile-bd); cursor: pointer; color: var(--fg);
+    background: linear-gradient(160deg, var(--surf1), var(--surf2)); display: flex; align-items: center; justify-content: center;
     transition: transform .08s ease; }
   .btn:active { transform: scale(.92); }
   .btn svg { width: 42%; height: 42%; fill: currentColor; }
-  .btn.play { width: 116px; height: 116px; color: #04121f; background: linear-gradient(160deg, #1db96a, #0f8f4f); border-color: #7CFFB2; }
+  /* play button carries the accent — the most prominent "live" control on the page */
+  .btn.play { width: 116px; height: 116px; color: #04121f; border-color: var(--accent);
+    background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 86%, #fff 14%), var(--accent)); }
 
   /* right: the programmable 2x2 grid — a square block with square tiles, matching the Default grid */
   .grid { flex: none; height: 100%; aspect-ratio: 1; display: grid; gap: 16px; }
-  .tile { border-radius: 16px; border: 1px solid #1a2738; cursor: pointer; overflow: hidden;
-    background: linear-gradient(160deg, #0e1a26, #0a1119); display: flex; flex-direction: column;
+  .tile { border-radius: 16px; border: 1px solid var(--tile-bd); cursor: pointer; overflow: hidden;
+    background: linear-gradient(160deg, var(--surf1), var(--surf2)); display: flex; flex-direction: column;
     align-items: center; justify-content: center; gap: 8px; transition: transform .08s ease; }
   .tile:active { transform: scale(.97); }
   .tile .ic { font-size: 52px; line-height: 1; }
   .tile .ic img { width: 60px; height: 60px; object-fit: contain; }
-  .tile .lb { font-size: 20px; color: #c7d4e2; font-weight: 600; padding: 0 8px; text-align: center;
+  .tile .lb { font-size: 20px; color: var(--fg); font-weight: 600; padding: 0 8px; text-align: center;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
-  .tile.empty { background: #0a0f16; border-style: dashed; border-color: #141c28; cursor: default; }
+  .tile.empty { background: var(--surf2); border-style: dashed; border-color: var(--tile-bd); cursor: default; }
 
   #recon { position: fixed; right: 14px; bottom: 10px; font-size: 12px; color: #c98; opacity: 0; transition: opacity .3s; }
   #recon.show { opacity: 1; }

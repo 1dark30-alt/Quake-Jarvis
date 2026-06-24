@@ -1,4 +1,13 @@
   function $(id){ return document.getElementById(id); }
+  // theme — host passes _dark=1/0 and _accent=#hex via the served query string
+  (function(){
+    try {
+      var q = new URLSearchParams(location.search);
+      document.body.classList.toggle('light', q.get('_dark') === '0');
+      var a = q.get('_accent') || '';
+      if (/^#[0-9a-fA-F]{6}$/.test(a)) document.documentElement.style.setProperty('--accent', a);
+    } catch (e) {}
+  })();
   function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   var ICON = {
     prev: '<svg viewBox="0 0 24 24"><path d="M7 6h2.4v12H7z"/><path d="M20 6v12l-9-6z"/></svg>',

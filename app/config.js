@@ -624,8 +624,10 @@
       <div class="row"><label>Effect</label>
         <select id="sEffect" style="width:230px">${effOpts}</select></div>
       <div class="row"><label>Color</label>
-        <input type="color" id="sColor" value="${hsvToHex(L.hue, L.sat)}" style="width:54px;height:30px;padding:2px">
-        <span id="sColorVal" class="hint" style="margin:0 0 0 10px">H${L.hue} S${L.sat}</span></div>
+        <label class="iconopt" style="width:auto"><input type="checkbox" id="sLedOvr"> Override theme accent</label>
+        <input type="color" id="sColor" value="${hsvToHex(L.hue, L.sat)}" style="width:48px;height:28px;padding:2px;margin-left:8px">
+        <span id="sColorVal" class="hint" style="margin:0 0 0 8px">H${L.hue} S${L.sat}</span></div>
+      <p class="hint" style="margin:-4px 0 0">The ring follows your theme accent by default — tick Override to set a fixed color here.</p>
       <div class="row"><label>Brightness</label>
         <input type="range" id="sBright" min="0" max="255" value="${L.brightness}" style="width:200px">
         <span id="sBrightVal" class="hint" style="margin:0 0 0 10px">${L.brightness}</span></div>
@@ -710,13 +712,17 @@
       document.getElementById('sRotA').onchange = e => { const r = currentRot(); r.cats.apps = e.target.checked; saveRot(r); };
     } else if (tab === 'hardware') {
       // Lighting writes go straight to the device (and persist in config) via the main process — no Save needed.
-      const live = patch => { Object.assign(L, patch); if (!config.settings) config.settings = {}; config.settings.lighting = Object.assign({}, L); configApi.setLighting(patch); };
+      const live = patch => { Object.assign(L, patch); if (!config.settings) config.settings = {}; config.settings.lighting = Object.assign({}, L); configApi.setLighting(patch); markDirty(); };
+      const sOvr = document.getElementById('sLedOvr'), sColEl = document.getElementById('sColor');
+      const ovrNow = !!(((config.settings || {}).lighting || {}).accentOverride);
+      sOvr.checked = ovrNow; sColEl.disabled = !ovrNow;
+      sOvr.onchange = e => { live({ accentOverride: e.target.checked }); sColEl.disabled = !e.target.checked; };
       document.getElementById('sEffect').value = String(L.effect);
       document.getElementById('sMic').checked = !!s.micOnLaunch;
       document.getElementById('sMic').onchange = e => setS('micOnLaunch', e.target.checked);
       document.getElementById('sEffect').onchange = e => live({ effect: parseInt(e.target.value, 10) });
       const cv = document.getElementById('sColorVal');
-      document.getElementById('sColor').onchange = e => { const { hue, sat } = hexToHsv(e.target.value); cv.textContent = `H${hue} S${sat}`; live({ hue, sat }); };
+      document.getElementById('sColor').onchange = e => { const { hue, sat } = hexToHsv(e.target.value); cv.textContent = `H${hue} S${sat}`; live({ hue, sat, accentOverride: true }); sOvr.checked = true; sColEl.disabled = false; };
       const bv = document.getElementById('sBrightVal');
       document.getElementById('sBright').oninput = e => { bv.textContent = e.target.value; };
       document.getElementById('sBright').onchange = e => live({ brightness: parseInt(e.target.value, 10) });
