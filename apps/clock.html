@@ -19,10 +19,10 @@
     --radius: clamp(6px, 1.4vh, 16px);
   }
   body.light {
-    --bg: radial-gradient(120% 160% at 50% 0%, #eef3f8 0%, #dde7f0 70%);
-    --card-top: #eef2f7;
-    --card-bottom: #dbe3ec;
-    --split: rgba(0, 0, 0, .14);
+    --bg: linear-gradient(to bottom, #FDFBF7 0%, #ffffff 100%);   /* the warm #FDFBF7 -> white backdrop the design calls for */
+    --card-top: #ffffff;
+    --card-bottom: #f4f7fa;
+    --split: rgba(0, 0, 0, .12);
     --label: #5a6c7e;
   }
   /* Light mode: accent digits get a black outline (and a darker colon + date) so they read with strong
@@ -31,12 +31,9 @@
   body.light .card .ampm { -webkit-text-stroke: 2px #0f141b; paint-order: stroke fill; text-shadow: none; }
   body.light .sep i { background: #0f141b; box-shadow: none; }
   body.light #corner .cdate, body.light #corner .cdow { color: #26323d; text-shadow: none; }
-  /* light card: a continuous top-to-bottom #FDFBF7 -> white gradient across the split halves
-     (each half renders its slice of a full-card-height gradient, anchored top / bottom). */
-  body.light .card .top, body.light .card .flap.top {
-    background: linear-gradient(to bottom, #FDFBF7, #ffffff); background-size: 100% var(--ch); background-position: center top; }
-  body.light .card .bottom, body.light .card .flap.bottom {
-    background: linear-gradient(to bottom, #FDFBF7, #ffffff); background-size: 100% var(--ch); background-position: center bottom; }
+  /* light card: clean white cards float on the warm page; soften the heavy dark drop-shadow so it
+     doesn't read as grey blobs on the pale backdrop. */
+  body.light .card { filter: drop-shadow(0 8px 16px rgba(40, 52, 74, .16)); }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; }
