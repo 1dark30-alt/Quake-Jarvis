@@ -127,6 +127,11 @@
   // ---- tiles / icons ----
   function blankTile() { return { label: '', icon: '', type: '', value: '', iconType: 'emoji', iconImage: '', iconUrl: '', iconCache: '' }; }
   function ensureTiles(g) { const need = g.cols * g.rows; while (g.tiles.length < need) g.tiles.push(blankTile()); g.tiles.length = need; }
+  // App-picker visibility (Settings -> Apps). Regular apps default SHOWN (listed in hiddenApps when off);
+  // developer apps (apps.json "dev": true) default HIDDEN (listed in shownDevApps when on) so releases ship them off.
+  function appHidden(id) { return (((config.settings || {}).hiddenApps) || []).includes(id); }
+  function devShown(id) { return (((config.settings || {}).shownDevApps) || []).includes(id); }
+  function appVisible(a) { return a && a.dev ? devShown(a.id) : !appHidden(a.id); }
 
   async function ensureAppIcon(value) {
     if (!value || Object.prototype.hasOwnProperty.call(appIconCache, value)) return;
@@ -549,7 +554,7 @@
       <div class="row"><label>Name</label><input id="gName" value="${esc(g.name)}"></div>
       <div class="row"><label>App</label><select id="gApp">
         <option value="">— choose an app —</option>
-        ${appDefs.map(a => `<option value="${esc(a.id)}" ${a.id === g.app ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
+        ${appDefs.filter(a => a.id === g.app || appVisible(a)).map(a => `<option value="${esc(a.id)}" ${a.id === g.app ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       </select></div>
       <div id="appOpts"></div>
       ${rotRowHtml(g)}
@@ -718,23 +723,55 @@
         <button id="sPresetSave" style="margin-left:10px">＋ Save current</button></div>
       <p class="hint">Drives the clock digits/hands, the tile-tap highlight, the music play button, and the knob LED ring. Click a preset to apply; <i>Save current</i> stores it (up to 6); right-click a preset to remove it. Changes apply when you Save.</p>`;
 
+    // Apps tab — show/hide which apps appear in the App picker (doesn't touch pages already using an app)
+    const appRow = (a, checked) => `<div class="row">
+        <label class="iconopt" style="width:auto; gap:9px"><input type="checkbox" class="appShow" data-id="${esc(a.id)}" data-dev="${a.dev ? 1 : 0}" ${checked ? 'checked' : ''}> ${esc(a.name)}</label>
+      </div>`;
+    const regularApps = appDefs.filter(a => !a.dev), devApps = appDefs.filter(a => a.dev);
+    const appsHtml = `
+      <p class="sectitle">Apps</p>
+      <p class="hint">Untick an app to hide it from the <b>App</b> dropdown when building a page. This only changes what's offered — pages already using a hidden app keep working.</p>
+      ${regularApps.length ? regularApps.map(a => appRow(a, !appHidden(a.id))).join('') : '<p class="hint">No apps found.</p>'}
+      ${devApps.length ? `<p class="sectitle" style="margin-top:22px">Developer</p>
+        <p class="hint">Personal apps, hidden by default. Tick one to show it in the App dropdown.</p>
+        ${devApps.map(a => appRow(a, devShown(a.id))).join('')}` : ''}`;
+
     el.innerHTML = `
       <p class="sectitle">Settings</p>
       <div class="tabbar">
         <button id="tabSw" class="tab${tab === 'software' ? ' on' : ''}">Software</button>
         <button id="tabHw" class="tab${tab === 'hardware' ? ' on' : ''}">Hardware</button>
         <button id="tabTh" class="tab${tab === 'theme' ? ' on' : ''}">Theme</button>
+        <button id="tabApps" class="tab${tab === 'apps' ? ' on' : ''}">Apps</button>
         <button id="tabMon" class="tab${tab === 'monitor' ? ' on' : ''}">Monitor</button>
       </div>
-      ${tab === 'software' ? swHtml : tab === 'hardware' ? hwHtml : tab === 'theme' ? thHtml : monHtml}
+      ${tab === 'software' ? swHtml : tab === 'hardware' ? hwHtml : tab === 'theme' ? thHtml : tab === 'apps' ? appsHtml : monHtml}
       <div class="row" style="margin-top:22px"><button id="sBack">← Back to pages</button></div>`;
 
     document.getElementById('tabSw').onclick = () => { settingsTab = 'software'; renderSettings(); };
     document.getElementById('tabHw').onclick = () => { settingsTab = 'hardware'; renderSettings(); };
     document.getElementById('tabTh').onclick = () => { settingsTab = 'theme'; renderSettings(); };
+    document.getElementById('tabApps').onclick = () => { settingsTab = 'apps'; renderSettings(); };
     document.getElementById('tabMon').onclick = () => { settingsTab = 'monitor'; renderSettings(); };
     document.getElementById('sBack').onclick = () => { view = 'pages'; render(); };
     const setS = (k, v) => { if (!config.settings) config.settings = {}; config.settings[k] = v; markDirty(); };
+
+    if (tab === 'apps') {
+      el.querySelectorAll('.appShow').forEach(c => c.onchange = e => {
+        const id = e.target.dataset.id, isDev = e.target.dataset.dev === '1';
+        if (!config.settings) config.settings = {};
+        if (isDev) {   // developer app: tracked when SHOWN (default hidden)
+          const shown = (config.settings.shownDevApps || []).filter(x => x !== id);
+          if (e.target.checked) shown.push(id);
+          config.settings.shownDevApps = shown;
+        } else {       // regular app: tracked when HIDDEN (default shown)
+          const hidden = (config.settings.hiddenApps || []).filter(x => x !== id);
+          if (!e.target.checked) hidden.push(id);
+          config.settings.hiddenApps = hidden;
+        }
+        markDirty();
+      });
+    }
 
     if (tab === 'software') {
       document.getElementById('sLaunch').value = s.launchMode;
