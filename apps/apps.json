@@ -136,6 +136,22 @@
         ]
       },
       {
+        "key": "display",
+        "label": "Display",
+        "type": "select",
+        "default": "digital",
+        "choices": [
+          [
+            "digital",
+            "Digital"
+          ],
+          [
+            "analog",
+            "Analog"
+          ]
+        ]
+      },
+      {
         "key": "format",
         "label": "Time format",
         "type": "select",
@@ -159,7 +175,7 @@
       },
       {
         "key": "color",
-        "label": "Color",
+        "label": "Accent (overridden by theme accent)",
         "type": "select",
         "default": "green",
         "choices": [
@@ -187,7 +203,7 @@
       },
       {
         "key": "usLayout",
-        "label": "US layout (US mode only)",
+        "label": "US layout",
         "type": "select",
         "default": "row",
         "choices": [
@@ -199,7 +215,11 @@
             "grid",
             "2 x 2"
           ]
-        ]
+        ],
+        "showIf": {
+          "key": "mode",
+          "value": "us"
+        }
       },
       {
         "key": "c1",
@@ -659,13 +679,21 @@
             "Pacific/Fiji",
             "Fiji"
           ]
-        ]
+        ],
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "l1",
         "label": "City 1 label (optional)",
         "type": "text",
-        "default": ""
+        "default": "",
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "c2",
@@ -1125,13 +1153,21 @@
             "Pacific/Fiji",
             "Fiji"
           ]
-        ]
+        ],
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "l2",
         "label": "City 2 label (optional)",
         "type": "text",
-        "default": ""
+        "default": "",
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "c3",
@@ -1591,13 +1627,21 @@
             "Pacific/Fiji",
             "Fiji"
           ]
-        ]
+        ],
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "l3",
         "label": "City 3 label (optional)",
         "type": "text",
-        "default": ""
+        "default": "",
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "c4",
@@ -2057,13 +2101,21 @@
             "Pacific/Fiji",
             "Fiji"
           ]
-        ]
+        ],
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "l4",
         "label": "City 4 label (optional)",
         "type": "text",
-        "default": ""
+        "default": "",
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "c5",
@@ -2523,13 +2575,21 @@
             "Pacific/Fiji",
             "Fiji"
           ]
-        ]
+        ],
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "l5",
         "label": "City 5 label (optional)",
         "type": "text",
-        "default": ""
+        "default": "",
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "c6",
@@ -2989,13 +3049,21 @@
             "Pacific/Fiji",
             "Fiji"
           ]
-        ]
+        ],
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       },
       {
         "key": "l6",
         "label": "City 6 label (optional)",
         "type": "text",
-        "default": ""
+        "default": "",
+        "showIf": {
+          "key": "mode",
+          "value": "cities"
+        }
       }
     ]
   }

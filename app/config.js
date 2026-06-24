@@ -508,7 +508,9 @@
     const el = document.getElementById('appOpts'); if (!el) return;
     if (!def) { el.innerHTML = ''; return; }
     if (!g.options) g.options = {};
-    el.innerHTML = (def.options || []).map(o => {
+    const valOf = key => (key in g.options) ? g.options[key] : ((def.options || []).find(x => x.key === key) || {}).default;
+    const visible = o => !o.showIf || String(valOf(o.showIf.key)) === String(o.showIf.value);   // conditional option (e.g. city slots only in Cities mode)
+    el.innerHTML = (def.options || []).filter(visible).map(o => {
       const v = (o.key in g.options) ? g.options[o.key] : o.default;
       let field;
       if (o.type === 'select') field = `<select class="aopt" data-key="${esc(o.key)}">${o.choices.map(ch => { const val = Array.isArray(ch) ? ch[0] : ch, lab = Array.isArray(ch) ? ch[1] : ch; return `<option value="${esc(val)}" ${String(v) === String(val) ? 'selected' : ''}>${esc(lab)}</option>`; }).join('')}</select>`;
@@ -522,6 +524,7 @@
       const o = (def.options || []).find(x => x.key === e.target.dataset.key);
       g.options[e.target.dataset.key] = (o && o.type === 'bool') ? e.target.checked : e.target.value;
       markDirty();
+      if (o && (o.type === 'select' || o.type === 'bool')) renderAppOpts(g, def);   // re-evaluate conditional (showIf) options
     });
   }
 

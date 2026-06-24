@@ -5,30 +5,38 @@
 <meta name="viewport" content="width=1920, height=480">
 <title>World Clock</title>
 <style>
-  :root { --bg:#05080d; --fg:#2bff88; --label:#8aa6b4; }
+  :root { --bg:#05080d; --fg:#e8f0f6; --label:#8aa6b4; --face:#0d1722; --tick:#3a4a5a; --accent:#2bff88; }
+  body.light { --bg:#eef3f8; --fg:#16242f; --label:#5a6c7e; --face:#ffffff; --tick:#b9c6d2; }
   * { margin:0; padding:0; box-sizing:border-box; }
   html, body { width:100%; height:100%; overflow:hidden; background:var(--bg);
     font-family:'Segoe UI', system-ui, -apple-system, sans-serif; }
   #grid { width:100vw; height:100vh; display:grid; }
   .cell { display:flex; flex-direction:column; align-items:center; justify-content:center;
     position:relative; padding:0 12px; min-width:0; }
-  /* subtle divider between cells */
   .cell::after { content:''; position:absolute; right:0; top:18%; height:64%; width:1px;
-    background:linear-gradient(transparent, rgba(255,255,255,.10), transparent); }
+    background:linear-gradient(transparent, color-mix(in srgb, var(--fg) 16%, transparent), transparent); }
   .cell.edge::after { display:none; }
-  .time { color:var(--fg); font-weight:700; line-height:.95; white-space:nowrap;
+  .time { color:var(--accent); font-weight:700; line-height:.95; white-space:nowrap;
     letter-spacing:.02em; font-variant-numeric:tabular-nums;
-    text-shadow:0 0 .28em currentColor, 0 0 .06em currentColor; }
+    text-shadow:0 0 .26em color-mix(in srgb, var(--accent) 55%, transparent); }
   .ampm { font-size:.34em; font-weight:700; opacity:.8; margin-left:.18em; vertical-align:.15em; }
   .label { color:var(--label); text-transform:uppercase; font-weight:600;
-    letter-spacing:.2em; margin-top:.45em; white-space:nowrap; }
+    letter-spacing:.2em; white-space:nowrap; }
+  .digital .label { margin-top:.45em; }
+  .sub { color:var(--label); font-variant-numeric:tabular-nums; opacity:.85; }
+  svg.face { display:block; }
+  .face .ring { fill:var(--face); stroke:color-mix(in srgb, var(--fg) 22%, transparent); }
+  .face .tick { stroke:var(--tick); }
+  .face .tickH { stroke:color-mix(in srgb, var(--fg) 70%, transparent); }
+  .face .hand { stroke:var(--fg); stroke-linecap:round; }
+  .face .sec { stroke:var(--accent); stroke-linecap:round; }
+  .face .pin { fill:var(--accent); }
 </style>
 </head>
 <body>
 <div id="grid"></div>
 <script>
   'use strict';
-  // ---- options (passed by the host as a URL #hash: key=value&key=value) ----
   function readOpts() {
     const o = {};
     (location.hash.slice(1) || '').split('&').forEach(kv => {
@@ -39,83 +47,133 @@
   }
   const O = readOpts();
   const isUS = (O.mode || 'us') === 'us';
+  const analog = O.display === 'analog';
   const fmt24 = O.format === '24';
   const showSec = O.seconds === '1' || O.seconds === 'true';
-  const COLORS = { green:'#2bff88', red:'#ff4040', amber:'#ffb000', blue:'#38b6ff', white:'#eef4ff' };
-  document.documentElement.style.setProperty('--fg', COLORS[O.color] || COLORS.green);
+
+  // theme (passed by the host: _dark=1/0, _accent=#hex) — fall back to a per-app color choice if present
+  document.body.classList.toggle('light', O._dark === '0');
+  const ACCENT_NAMES = { green:'#2bff88', red:'#ff4040', amber:'#ffb000', blue:'#38b6ff', white:'#eef4ff' };
+  const accent = /^#[0-9a-fA-F]{6}$/.test(O._accent || '') ? O._accent : (ACCENT_NAMES[O.color] || null);
+  if (accent) document.documentElement.style.setProperty('--accent', accent);
 
   const US_ZONES = [['US/Pacific','Pacific'], ['US/Mountain','Mountain'], ['US/Central','Central'], ['US/Eastern','Eastern']];
   const prettify = z => (z || '').split('/').pop().replace(/_/g, ' ');
 
-  // ---- which cells to show ----
   let cells;
-  if (isUS) {
-    cells = US_ZONES.map(([zone, label]) => ({ zone, label }));
-  } else {
+  if (isUS) cells = US_ZONES.map(([zone, label]) => ({ zone, label }));
+  else {
     cells = [];
-    for (let i = 1; i <= 6; i++) {
-      const z = O['c' + i];
-      if (z) cells.push({ zone: z, label: (O['l' + i] && O['l' + i].trim()) ? O['l' + i].trim() : prettify(z) });
-    }
-    if (!cells.length) cells = US_ZONES.map(([zone, label]) => ({ zone, label }));   // nothing picked -> US fallback
+    for (let i = 1; i <= 6; i++) { const z = O['c' + i]; if (z) cells.push({ zone: z, label: (O['l' + i] && O['l' + i].trim()) ? O['l' + i].trim() : prettify(z) }); }
+    if (!cells.length) cells = US_ZONES.map(([zone, label]) => ({ zone, label }));
   }
 
-  // ---- layout (fill the 1920x480 panel) ----
   const n = cells.length;
   let cols, rows;
-  if (isUS) {
-    if (O.usLayout === 'grid') { cols = 2; rows = 2; } else { cols = 4; rows = 1; }
-  } else if (n <= 3) { cols = n; rows = 1; }
+  if (isUS) { if (O.usLayout === 'grid') { cols = 2; rows = 2; } else { cols = 4; rows = 1; } }
+  else if (n <= 3) { cols = n; rows = 1; }
   else { cols = Math.ceil(n / 2); rows = 2; }
 
   const grid = document.getElementById('grid');
   grid.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
   grid.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
-
-  cells.forEach((c, i) => {
-    const cell = document.createElement('div'); cell.className = 'cell';
-    if ((i % cols) === cols - 1) cell.classList.add('edge');          // no divider on the last column
-    const t = document.createElement('div'); t.className = 'time';
-    const l = document.createElement('div'); l.className = 'label'; l.textContent = c.label;
-    cell.appendChild(t); cell.appendChild(l); grid.appendChild(cell);
-    c.el = t;
-  });
-
-  // ---- fit the digits: shrink a sample string until it fits the cell box ----
   const cellW = 1920 / cols, cellH = 480 / rows;
-  const sample = (fmt24 ? '88:88' : '88:88') + (showSec ? ':88' : '') + (fmt24 ? '' : ' PM');
-  function fitFont() {
-    const probe = cells[0].el;
-    let size = Math.min(cellH * 0.50, 300);
-    probe.style.fontSize = size + 'px'; probe.textContent = sample;
-    let guard = 0;
-    while (probe.scrollWidth > cellW * 0.86 && size > 16 && guard++ < 400) { size -= 3; probe.style.fontSize = size + 'px'; }
-    const labelSize = Math.max(13, Math.min(cellH * 0.13, 38));
-    cells.forEach(c => { c.el.style.fontSize = size + 'px'; c.el.parentElement.querySelector('.label').style.fontSize = labelSize + 'px'; });
-  }
 
-  // ---- render time per zone (DST-correct via Intl) ----
-  function timeString(zone) {
+  // ---- time helpers (DST-correct via Intl) ----
+  function partsIn(zone) {
+    try {
+      const p = {};
+      new Intl.DateTimeFormat('en-US', { timeZone: zone, hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        .formatToParts(new Date()).forEach(x => { if (x.type !== 'literal') p[x.type] = parseInt(x.value, 10); });
+      return p;
+    } catch (e) { return { hour: 0, minute: 0, second: 0 }; }
+  }
+  function digitalString(zone) {
     try {
       const opt = { timeZone: zone, hour: 'numeric', minute: '2-digit', hour12: !fmt24 };
       if (showSec) opt.second = '2-digit';
       return new Intl.DateTimeFormat('en-US', opt).format(new Date());
     } catch (e) { return '--:--'; }
   }
-  function paint(el, zone) {
-    const s = timeString(zone);
-    const m = s.match(/\s?(AM|PM)$/i);
-    if (m) {
-      el.textContent = s.slice(0, m.index);
-      const ap = document.createElement('span'); ap.className = 'ampm'; ap.textContent = m[1].toUpperCase();
-      el.appendChild(ap);
-    } else { el.textContent = s; }
-  }
-  function tick() { cells.forEach(c => paint(c.el, c.zone)); }
 
-  fitFont();
-  tick();
-  setInterval(tick, 1000);
+  if (analog) buildAnalog(); else buildDigital();
+
+  // ===================== DIGITAL =====================
+  function buildDigital() {
+    cells.forEach((c, i) => {
+      const cell = document.createElement('div'); cell.className = 'cell digital';
+      if ((i % cols) === cols - 1) cell.classList.add('edge');
+      const t = document.createElement('div'); t.className = 'time';
+      const l = document.createElement('div'); l.className = 'label'; l.textContent = c.label;
+      cell.appendChild(t); cell.appendChild(l); grid.appendChild(cell);
+      c.el = t; c.lb = l;
+    });
+    const sample = '88:88' + (showSec ? ':88' : '') + (fmt24 ? '' : ' PM');
+    const probe = cells[0].el; let size = Math.min(cellH * 0.5, 300);
+    probe.style.fontSize = size + 'px'; probe.textContent = sample; let g = 0;
+    while (probe.scrollWidth > cellW * 0.86 && size > 16 && g++ < 400) { size -= 3; probe.style.fontSize = size + 'px'; }
+    const labelSize = Math.max(13, Math.min(cellH * 0.13, 38));
+    cells.forEach(c => { c.el.style.fontSize = size + 'px'; c.lb.style.fontSize = labelSize + 'px'; });
+    function paint(el, zone) {
+      const s = digitalString(zone), m = s.match(/\s?(AM|PM)$/i);
+      if (m) { el.textContent = s.slice(0, m.index); const ap = document.createElement('span'); ap.className = 'ampm'; ap.textContent = m[1].toUpperCase(); el.appendChild(ap); }
+      else el.textContent = s;
+    }
+    const tick = () => cells.forEach(c => paint(c.el, c.zone));
+    tick(); setInterval(tick, 1000);
+  }
+
+  // ===================== ANALOG =====================
+  function buildAnalog() {
+    const labelSize = Math.max(13, Math.min(cellH * 0.12, 32));
+    const subSize = Math.max(12, labelSize * 0.7);
+    const dia = Math.min(cellW * 0.78, cellH * (rows === 1 ? 0.62 : 0.66));   // face diameter
+    const R = 50, NS = 'http://www.w3.org/2000/svg';
+    cells.forEach((c, i) => {
+      const cell = document.createElement('div'); cell.className = 'cell analog';
+      if ((i % cols) === cols - 1) cell.classList.add('edge');
+      const svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'face'); svg.setAttribute('viewBox', '0 0 100 100');
+      svg.setAttribute('width', dia); svg.setAttribute('height', dia);
+      const ring = document.createElementNS(NS, 'circle');
+      ring.setAttribute('class', 'ring'); ring.setAttribute('cx', R); ring.setAttribute('cy', R); ring.setAttribute('r', 47); ring.setAttribute('stroke-width', 2);
+      svg.appendChild(ring);
+      for (let h = 0; h < 12; h++) {
+        const a = h * 30 * Math.PI / 180, big = h % 3 === 0;
+        const r1 = big ? 38 : 41, r2 = 45;
+        const ln = document.createElementNS(NS, 'line');
+        ln.setAttribute('class', big ? 'tickH' : 'tick');
+        ln.setAttribute('x1', R + r1 * Math.sin(a)); ln.setAttribute('y1', R - r1 * Math.cos(a));
+        ln.setAttribute('x2', R + r2 * Math.sin(a)); ln.setAttribute('y2', R - r2 * Math.cos(a));
+        ln.setAttribute('stroke-width', big ? 2.4 : 1.4);
+        svg.appendChild(ln);
+      }
+      const hourH = document.createElementNS(NS, 'line'); hourH.setAttribute('class', 'hand'); hourH.setAttribute('stroke-width', 3.4);
+      const minH = document.createElementNS(NS, 'line'); minH.setAttribute('class', 'hand'); minH.setAttribute('stroke-width', 2.4);
+      const secH = document.createElementNS(NS, 'line'); secH.setAttribute('class', 'sec'); secH.setAttribute('stroke-width', 1);
+      svg.appendChild(hourH); svg.appendChild(minH); if (showSec) svg.appendChild(secH);
+      const pin = document.createElementNS(NS, 'circle'); pin.setAttribute('class', 'pin'); pin.setAttribute('cx', R); pin.setAttribute('cy', R); pin.setAttribute('r', 2.4); svg.appendChild(pin);
+      const l = document.createElement('div'); l.className = 'label'; l.style.fontSize = labelSize + 'px'; l.style.marginTop = (dia * 0.05) + 'px'; l.textContent = c.label;
+      const sub = document.createElement('div'); sub.className = 'sub'; sub.style.fontSize = subSize + 'px';
+      cell.appendChild(svg); cell.appendChild(l); cell.appendChild(sub); grid.appendChild(cell);
+      c.hourH = hourH; c.minH = minH; c.secH = secH; c.sub = sub;
+    });
+    function hand(el, ang, len) {
+      const a = ang * Math.PI / 180;
+      el.setAttribute('x1', 50 - 12 * Math.sin(a)); el.setAttribute('y1', 50 + 12 * Math.cos(a));
+      el.setAttribute('x2', 50 + len * Math.sin(a)); el.setAttribute('y2', 50 - len * Math.cos(a));
+    }
+    function tick() {
+      cells.forEach(c => {
+        const p = partsIn(c.zone);
+        hand(c.hourH, ((p.hour % 12) + p.minute / 60) * 30, 26);
+        hand(c.minH, (p.minute + p.second / 60) * 6, 37);
+        if (showSec) hand(c.secH, p.second * 6, 40);
+        c.sub.textContent = digitalString(c.zone);
+      });
+    }
+    tick(); setInterval(tick, 1000);
+  }
 </script>
 </body>
 </html>
