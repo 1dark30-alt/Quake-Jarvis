@@ -19,7 +19,8 @@
     if (!disks || !disks.length){ host.innerHTML = '<div class="dim" style="font-size:14px">—</div>'; return; }
     host.innerHTML = disks.map(function(d){
       var p = num(d.usePct);
-      var col = p==null ? '#2a3a4d' : (p>90 ? '#ff6b6b' : p>75 ? '#ffb454' : '#7CFFB2');
+      var lt = window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches;   // darker bar fills read better on the white light-mode cards
+      var col = p==null ? (lt?'#aebccb':'#2a3a4d') : (p>90 ? (lt?'#d63b3b':'#ff6b6b') : p>75 ? (lt?'#c77a14':'#ffb454') : (lt?'#1f9d57':'#7CFFB2'));
       return '<div class="drow"><div class="dhead"><span class="k">' + esc(d.mount||'?') + '</span>'
         + '<span class="v">' + bstr(d.usedBytes) + ' / ' + bstr(d.totalBytes) + ' · ' + pct(p) + '</span></div>'
         + '<div class="bar"><div class="barfill" style="width:' + (p==null?0:Math.min(100,p)) + '%;background:' + col + '"></div></div></div>';

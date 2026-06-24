@@ -16,19 +16,6 @@
   .dim { color: #9fb3c8; }
   .body { flex: 1; display: flex; min-height: 0; }
 
-  /* ---- light mode (follows the global theme via the OS color-scheme) ---- */
-  @media (prefers-color-scheme: light) {
-    body { background: #d9e1ea; color: #13202c; }                                  /* grey page so the white cards read as cards, not a flat white sheet */
-    .panel { background: #ffffff; border-color: #bac7d5; box-shadow: 0 1px 4px rgba(20,40,70,.10); }
-    .ptitle, .glbl, .hlbl, .devhead .sub, .netrow .u, .dim, .mrow .v, .drow .v, .battsub { color: #46566a; }
-    .mrow .k, .legend span, .devhead .name, .gval, .htot, .battpct, .drow .k { color: #13202c; }
-    .up { color: #0f8a4d; } .down { color: #1574c4; }                              /* darkened so the net speeds stay legible on white */
-    .battfill { background: #0f8a4d; }
-    .gtrack { stroke: #cdd7e2; }
-    .bar { background: #dde4ec; }
-    .donut .hole { background: #ffffff; }
-  }
-
   /* ---- left column: CPU + GPU cards (temp + load gauges each) ---- */
   .col { display: flex; flex-direction: column; gap: 10px; flex: 1.15; }
   .devcard { flex: 1; }
@@ -87,6 +74,25 @@
 
   #recon { position: fixed; right: 12px; bottom: 8px; font-size: 12px; color: #c98; opacity: 0; transition: opacity .3s; }
   #recon.show { opacity: 1; }
+
+  /* ---- light mode (follows the global theme via the OS color-scheme). Placed LAST so these overrides
+     win over the same-specificity base rules above (.gtrack/.bar/.donut .hole/.up/.down/.mrow .k/...). ---- */
+  @media (prefers-color-scheme: light) {
+    body { background: #d9e1ea; color: #13202c; }                                  /* grey page so the white cards read as cards, not a flat white sheet */
+    .panel { background: #ffffff; border-color: #bac7d5; box-shadow: 0 1px 4px rgba(20,40,70,.10); }
+    .ptitle, .glbl, .hlbl, .devhead .sub, .netrow .u, .dim, .mrow .v, .drow .v, .battsub { color: #46566a; }
+    .mrow .k, .legend span, .devhead .name, .gval, .htot, .battpct, .drow .k { color: #13202c; }
+    .gtrack { stroke: #ccd6e1; }                                                   /* gauge ring track: light grey, not near-black */
+    #cpuLoadArc { stroke: #1f9d57; } #gpuLoadArc { stroke: #1f7fc4; }              /* darken the load arcs so they read on white */
+    .bar { background: #dbe2ea; }                                                  /* bar track */
+    #memUsedBar { background: linear-gradient(90deg, #1f7fc4, #1f9d57) !important; } /* darker used-memory fill */
+    #memFreeBar { background: #aebccb !important; }                                /* "free" memory bar: light grey, NOT a black bar */
+    .donut { background: conic-gradient(from 0deg, #1f9d57, #1f7fc4, #7b4ad6, #1f9d57); } /* readable ring on white */
+    .donut .hole { background: #ffffff; }                                          /* processes donut centre: white, not black */
+    .up { color: #0f8a4d; } .down { color: #1574c4; }                             /* darkened so the net speeds stay legible on white */
+    .battfill { background: #0f8a4d; }
+    .batt { border-color: #9aabbd; } .batt::after { background: #9aabbd; }
+  }
 </style>
 </head>
 <body>
