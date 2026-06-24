@@ -16,6 +16,17 @@
   .dim { color: #9fb3c8; }
   .body { flex: 1; display: flex; min-height: 0; }
 
+  /* ---- light mode (follows the global theme via the OS color-scheme) ---- */
+  @media (prefers-color-scheme: light) {
+    body { background: #eef3f8; color: #1c2a39; }
+    .panel { background: linear-gradient(160deg, #ffffff, #f1f5f9); border-color: #d2dce6; }
+    .ptitle, .glbl, .hlbl, .devhead .sub, .netrow .u, .dim, .mrow .v { color: #5a6c7e; }
+    .mrow .k, .legend span { color: #1c2a39; }
+    .gtrack { stroke: #d8e1ea; }
+    .bar { background: #e2e9f0; }
+    .donut .hole { background: #f1f5f9; }
+  }
+
   /* ---- left column: CPU + GPU cards (temp + load gauges each) ---- */
   .col { display: flex; flex-direction: column; gap: 10px; flex: 1.15; }
   .devcard { flex: 1; }

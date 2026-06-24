@@ -5,29 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>Flip Clock</title>
 <style>
-  /* ---- theme ---- */
+  /* ---- theme (light/dark + accent come from the host: _dark / _accent) ---- */
   :root {
+    --accent: #7CFFB2;
     --bg: radial-gradient(120% 160% at 50% 0%, #0e1622 0%, #05080d 70%);
     --card-top: #20242c;
     --card-bottom: #141821;
-    --digit: #aef4ff;
-    --digit-glow: 0 0 18px rgba(120, 230, 255, .45);
-    --fg: #aef4ff;                /* text on the page background (corner, colon) */
+    --digit: var(--accent);
+    --digit-glow: 0 0 18px color-mix(in srgb, var(--accent) 45%, transparent);
+    --fg: var(--accent);         /* corner / colon */
     --split: rgba(0, 0, 0, .55);
     --label: #6f8298;
-    --accent: #7CFFB2;
     --radius: clamp(6px, 1.4vh, 16px);
   }
-  body.classic {
-    --bg: radial-gradient(120% 160% at 50% 0%, #2a2622 0%, #15120e 70%);
-    --card-top: #f6f2e9;
-    --card-bottom: #e4ddcf;
-    --digit: #1b1b1b;
-    --digit-glow: none;
-    --fg: #d9cbb0;                /* light cream so corner/colon are visible on the dark classic bg */
-    --split: rgba(0, 0, 0, .28);
-    --label: #b9a98c;
-    --accent: #c8a96b;
+  body.light {
+    --bg: radial-gradient(120% 160% at 50% 0%, #eef3f8 0%, #dde7f0 70%);
+    --card-top: #ffffff;
+    --card-bottom: #e9eef4;
+    --split: rgba(0, 0, 0, .14);
+    --label: #5a6c7e;
   }
 
   * { box-sizing: border-box; }
@@ -112,8 +108,6 @@
     <h4>Clock</h4>
     <div class="row"><span style="flex:1">Mode</span>
       <div class="seg"><button data-set="mode" data-val="24">24h</button><button data-set="mode" data-val="12">12h</button></div></div>
-    <div class="row"><span style="flex:1">Theme</span>
-      <div class="seg"><button data-set="theme" data-val="dark">Dark</button><button data-set="theme" data-val="classic">Classic</button></div></div>
     <div class="row"><label><input type="checkbox" data-toggle="seconds"> Show seconds</label></div>
     <div class="row"><label><input type="checkbox" data-toggle="date"> Show date &amp; day</label></div>
   </div>
@@ -124,7 +118,7 @@
   const $ = sel => document.querySelector(sel);
 
   // ---- settings (localStorage + URL params) ----
-  const defaults = { mode: '24', theme: 'dark', seconds: false, date: true };
+  const defaults = { mode: '24', seconds: false, date: true };
   // Read params from the full href — robust for file:// (where location.search is often empty
   // in an Electron webview). Accepts both ?query and #hash forms.
   function readParams() {
@@ -141,7 +135,6 @@
     try { Object.assign(s, JSON.parse(localStorage.getItem('flipclock') || '{}')); } catch (e) {}
     const p = readParams();
     if ('mode' in p) s.mode = p.mode === '12' ? '12' : '24';
-    if ('theme' in p) s.theme = p.theme === 'classic' ? 'classic' : 'dark';
     if ('seconds' in p) s.seconds = p.seconds === '1' || p.seconds === 'true';
     if ('date' in p) s.date = !(p.date === '0' || p.date === 'false');
     return s;
@@ -174,7 +167,9 @@
   function sep() { const s = document.createElement('div'); s.className = 'sep'; s.innerHTML = '<i></i><i></i>'; return s; }
 
   function build() {
-    document.body.classList.toggle('classic', settings.theme === 'classic');
+    const tp = readParams();
+    document.body.classList.toggle('light', tp._dark === '0');
+    if (/^#[0-9a-fA-F]{6}$/.test(tp._accent || '')) document.documentElement.style.setProperty('--accent', tp._accent);
     applySizing();
     cards = {}; clock.innerHTML = '';
     if (settings.mode === '12') {                              // one wide hour card with an AM/PM badge

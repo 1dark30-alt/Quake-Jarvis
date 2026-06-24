@@ -87,6 +87,38 @@
     return mods.concat(key).join('+');
   }
 
+  // ---- per-page Advanced: override the global theme for just this page ----
+  // appearance: 'inherit' | 'light' | 'dark'   ·   accent: '' (inherit) | '#rrggbb'
+  function advRowHtml(g) {
+    const hasApr = g.appearance === 'light' || g.appearance === 'dark';
+    const hasAcc = /^#[0-9a-fA-F]{6}$/.test(g.accent || '');
+    return `<details class="advsec" style="margin-top:12px"${(hasApr || hasAcc) ? ' open' : ''}>
+      <summary style="cursor:pointer;color:#9fb3c8;font-size:13px;user-select:none">Advanced settings</summary>
+      <div class="row" style="margin-top:8px"><label style="width:auto">Appearance</label>
+        <label class="iconopt" style="width:auto"><input type="checkbox" id="gAprOn" ${hasApr ? 'checked' : ''}> Override</label>
+        <select id="gApr" style="width:130px;margin-left:8px" ${hasApr ? '' : 'disabled'}>
+          <option value="dark" ${g.appearance === 'dark' ? 'selected' : ''}>Dark</option>
+          <option value="light" ${g.appearance === 'light' ? 'selected' : ''}>Light</option>
+        </select></div>
+      <div class="row"><label style="width:auto">Accent</label>
+        <label class="iconopt" style="width:auto"><input type="checkbox" id="gAccOn" ${hasAcc ? 'checked' : ''}> Override</label>
+        <input type="color" id="gAcc" value="${hasAcc ? esc(g.accent) : '#7CFFB2'}" style="width:48px;height:28px;padding:2px;margin-left:8px" ${hasAcc ? '' : 'disabled'}></div>
+      <p class="hint">When checked, this page overrides the global theme. (Web dashboards follow the global light/dark only.)</p>
+    </details>`;
+  }
+  function wireAdvRow(g) {
+    const aprOn = document.getElementById('gAprOn'), apr = document.getElementById('gApr');
+    if (aprOn && apr) {
+      aprOn.onchange = e => { g.appearance = e.target.checked ? apr.value : 'inherit'; apr.disabled = !e.target.checked; markDirty(); };
+      apr.onchange = e => { if (aprOn.checked) { g.appearance = e.target.value; markDirty(); } };
+    }
+    const accOn = document.getElementById('gAccOn'), acc = document.getElementById('gAcc');
+    if (accOn && acc) {
+      accOn.onchange = e => { if (e.target.checked) g.accent = acc.value; else delete g.accent; acc.disabled = !e.target.checked; markDirty(); };
+      acc.oninput = e => { if (accOn.checked) { g.accent = e.target.value; markDirty(); } };
+    }
+  }
+
   // ---- save model (no live edit) ----
   function setState(text, cls) { const el = document.getElementById('state'); el.textContent = text; el.className = 'state' + (cls ? ' ' + cls : ''); }
   function markDirty() { dirty = true; setState('● unsaved changes', 'dirty'); document.getElementById('saveBtn').disabled = false; }
@@ -160,6 +192,7 @@
         <label style="width:auto;margin-left:10px">Rows</label><input id="gRows" type="number" min="1" max="6" value="${g.rows}" style="width:90px"></div>
       ${rotRowHtml(g)}
       ${shortcutRowHtml(g)}
+      ${advRowHtml(g)}
       <div class="row">
         <button class="danger" id="gDelete">Delete grid</button>
       </div>`;
@@ -167,7 +200,7 @@
     document.getElementById('gCols').onchange = e => { clearAllMerges(g); g.cols = Math.max(1, Math.min(12, +e.target.value || 1)); ensureTiles(g); ti = -1; selEnd = -1; render(); markDirty(); };
     document.getElementById('gRows').onchange = e => { clearAllMerges(g); g.rows = Math.max(1, Math.min(6, +e.target.value || 1)); ensureTiles(g); ti = -1; selEnd = -1; render(); markDirty(); };
     document.getElementById('gDelete').onclick = deleteCurrentPage;
-    wireRotRow(g); wireShortcutRow(g);
+    wireRotRow(g); wireShortcutRow(g); wireAdvRow(g);
   }
 
   // ---- tile cells (with merge/span support) ----
@@ -431,7 +464,7 @@
     document.getElementById('gDelete').onclick = deleteCurrentPage;
     document.getElementById('gExt').onchange = e => { g.linksExternal = e.target.checked; markDirty(); };
     const gua = document.getElementById('gUA'); if (gua) gua.onchange = e => { g.desktopUA = e.target.checked; markDirty(); };
-    wireRotRow(g); wireShortcutRow(g);
+    wireRotRow(g); wireShortcutRow(g); wireAdvRow(g);
     renderAuthFields(g);
   }
   function setAuthType(g, type) {
@@ -482,12 +515,13 @@
       <div id="appOpts"></div>
       ${rotRowHtml(g)}
       ${shortcutRowHtml(g)}
+      ${advRowHtml(g)}
       <div class="row" style="margin-top:10px"><button class="danger" id="gDelete">Delete page</button></div>
       <p class="hint">${def ? esc(def.name) + ' runs locally and shows full-screen on the panel.' : 'Pick an app, then set its options below.'}</p>`;
     document.getElementById('gName').oninput = e => { g.name = e.target.value; renderGrids(); markDirty(); };
     document.getElementById('gApp').onchange = e => { setApp(g, e.target.value); render(); markDirty(); };
     document.getElementById('gDelete').onclick = deleteCurrentPage;
-    wireRotRow(g); wireShortcutRow(g);
+    wireRotRow(g); wireShortcutRow(g); wireAdvRow(g);
     renderAppOpts(g, def);
   }
   function setApp(g, id) {

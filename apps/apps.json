@@ -21,22 +21,6 @@
         ]
       },
       {
-        "key": "theme",
-        "label": "Theme",
-        "type": "select",
-        "default": "dark",
-        "choices": [
-          [
-            "dark",
-            "Dark"
-          ],
-          [
-            "classic",
-            "Classic"
-          ]
-        ]
-      },
-      {
         "key": "seconds",
         "label": "Show seconds",
         "type": "bool",
@@ -172,34 +156,6 @@
         "label": "Show seconds",
         "type": "bool",
         "default": false
-      },
-      {
-        "key": "color",
-        "label": "Accent (overridden by theme accent)",
-        "type": "select",
-        "default": "green",
-        "choices": [
-          [
-            "green",
-            "Green"
-          ],
-          [
-            "red",
-            "Red"
-          ],
-          [
-            "amber",
-            "Amber"
-          ],
-          [
-            "blue",
-            "Blue"
-          ],
-          [
-            "white",
-            "White"
-          ]
-        ]
       },
       {
         "key": "usLayout",
