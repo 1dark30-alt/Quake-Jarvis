@@ -1,6 +1,6 @@
   const configApi = window.openQuakeConfig;
   let config = { activeGridId: null, grids: [] };
-  let gi = 0, ti = -1, selEnd = -1, dragFrom = -1, dirty = false, appDefs = [], view = 'pages', ledState = null, settingsTab = 'software';
+  let gi = 0, ti = -1, selEnd = -1, dragFrom = -1, dirty = false, appDefs = [], view = 'pages', ledState = null, settingsTab = 'software', dashTab = 'page';
   // QMK RGB-Matrix effect names — index is the value written to the device (0 = ring off).
   const LED_EFFECTS = ['All Off (ring off)', 'Solid Color', 'Alphas Mods', 'Gradient Up/Down', 'Gradient Left/Right', 'Breathing', 'Band Sat.', 'Band Val.', 'Pinwheel Sat.', 'Pinwheel Val.', 'Spiral Sat.', 'Spiral Val.', 'Cycle All', 'Cycle Left/Right', 'Cycle Up/Down', 'Rainbow Moving Chevron', 'Cycle Out/In', 'Cycle Out/In Dual', 'Cycle Pinwheel', 'Cycle Spiral', 'Dual Beacon', 'Rainbow Beacon', 'Rainbow Pinwheels', 'Raindrops', 'Jellybean Raindrops', 'Hue Breathing', 'Hue Pendulum', 'Hue Wave', 'Pixel Rain', 'Pixel Flow', 'Pixel Fractal', 'Typing Heatmap', 'Digital Rain', 'Solid Reactive Simple', 'Solid Reactive', 'Solid Reactive Wide', 'Solid Reactive Multi Wide', 'Solid Reactive Cross', 'Solid Reactive Multi Cross', 'Solid Reactive Nexus', 'Solid Reactive Multi Nexus', 'Splash', 'Multi Splash', 'Solid Splash', 'Solid Multi Splash'];
   const LED_DEFAULT = { effect: 1, brightness: 200, speed: 128, hue: 128, sat: 255 };
@@ -437,7 +437,30 @@
     if (!g.auth) g.auth = g.haToken ? { type: 'ha', token: g.haToken } : { type: 'none' };
     delete g.haToken;
     const el = document.getElementById('gridmeta');
-    el.innerHTML = `
+    const onButtons = g.gridOn && dashTab === 'buttons';
+    // tab bar: the Buttons tab only exists once a grid is enabled (revealed by the Add-grid checkbox)
+    const tabBar = `<div class="tabbar">
+        <button id="dtPage" class="tab${onButtons ? '' : ' on'}">Dashboard</button>
+        ${g.gridOn ? `<button id="dtBtns" class="tab${onButtons ? ' on' : ''}">Buttons</button>` : ''}</div>`;
+
+    if (onButtons) {   // ---- Buttons tab: strip side + size; the tile editor renders below (in render()) ----
+      const cols = g.cols || 2;
+      el.innerHTML = tabBar + `
+        <div class="row"><label style="width:auto">Side</label><select id="gAlign">
+            <option value="right" ${g.gridAlign !== 'left' ? 'selected' : ''}>Right</option>
+            <option value="left" ${g.gridAlign === 'left' ? 'selected' : ''}>Left</option></select>
+          <label style="width:auto; margin-left:16px">Size</label><select id="gSize">
+            <option value="1" ${cols === 1 ? 'selected' : ''}>2×1</option>
+            <option value="2" ${cols === 2 ? 'selected' : ''}>2×2</option>
+            <option value="3" ${cols === 3 ? 'selected' : ''}>2×3</option></select></div>
+        <p class="hint">A strip of launcher tiles on the chosen side of the dashboard — 2 rows tall, 1–3 columns wide. Edit the tiles below. Uncheck <b>Add a button grid</b> on the Dashboard tab to remove it.</p>`;
+      document.getElementById('dtPage').onclick = () => { dashTab = 'page'; render(); };
+      document.getElementById('gAlign').onchange = e => { g.gridAlign = e.target.value === 'left' ? 'left' : 'right'; markDirty(); };
+      document.getElementById('gSize').onchange = e => { clearAllMerges(g); g.cols = Math.max(1, Math.min(3, +e.target.value || 2)); g.rows = 2; ensureTiles(g); ti = -1; selEnd = -1; render(); markDirty(); };
+      return;
+    }
+
+    el.innerHTML = tabBar + `
       <div class="row"><label>Name</label><input id="gName" value="${esc(g.name)}"></div>
       <div class="row"><label>URL</label><input id="gUrl" value="${esc(g.url)}" placeholder="https://…  (dashboard, monitoring page, etc.)"></div>
       <div class="row"><label>Auth</label><select id="gAuth">
@@ -453,17 +476,33 @@
       <div class="row" style="margin-top:10px"><label style="width:auto">Identity</label>
         <label class="iconopt" style="width:auto; white-space:nowrap"><input type="checkbox" id="gUA" ${g.desktopUA ? 'checked' : ''}> Use a desktop browser identity</label></div>
       <p class="hint">Makes this page look like desktop Chrome instead of an embedded app. Turn on for sites that won't load or let you sign in inside the panel (e.g. claude.ai, chatgpt.com). The panel keeps its own login, separate from your PC browser.</p>
+      <div class="row" style="margin-top:10px"><label style="width:auto">Buttons</label>
+        <label class="iconopt" style="width:auto; white-space:nowrap"><input type="checkbox" id="gGrid" ${g.gridOn ? 'checked' : ''}> Add a button grid beside the dashboard</label></div>
+      <p class="hint">Adds a strip of launcher tiles beside the web view — pick the side, size, and tiles on the <b>Buttons</b> tab that appears.</p>
       ${rotRowHtml(g)}
       ${shortcutRowHtml(g)}
       <div class="row" style="margin-top:10px"><button class="danger" id="gDelete">Delete page</button></div>
       <p class="hint" id="authHint"></p>
       <p class="hint">Shown full-screen on the panel. Knob scrolls · tap clicks · double-click the knob returns to the page selector.</p>`;
+    const dtb = document.getElementById('dtBtns'); if (dtb) dtb.onclick = () => { dashTab = 'buttons'; render(); };
     document.getElementById('gName').oninput = e => { g.name = e.target.value; renderGrids(); markDirty(); };
     document.getElementById('gUrl').oninput = e => { g.url = e.target.value; markDirty(); };
     document.getElementById('gAuth').onchange = e => { setAuthType(g, e.target.value); renderAuthFields(g); markDirty(); };
     document.getElementById('gDelete').onclick = deleteCurrentPage;
     document.getElementById('gExt').onchange = e => { g.linksExternal = e.target.checked; markDirty(); };
     const gua = document.getElementById('gUA'); if (gua) gua.onchange = e => { g.desktopUA = e.target.checked; markDirty(); };
+    document.getElementById('gGrid').onchange = e => {
+      g.gridOn = e.target.checked;
+      if (g.gridOn) {   // a dashboard button grid reuses the grid schema: cols/rows/tiles (+ align)
+        if (typeof g.cols !== 'number') g.cols = 2;
+        if (typeof g.rows !== 'number') g.rows = 2;
+        if (!Array.isArray(g.tiles)) g.tiles = [];
+        if (!g.gridAlign) g.gridAlign = 'right';
+        ensureTiles(g);
+        dashTab = 'buttons';   // reveal + jump to the new tab
+      } else { dashTab = 'page'; }
+      ti = -1; selEnd = -1; render(); markDirty();
+    };
     wireRotRow(g); wireShortcutRow(g); wireAdvRow(g);
     renderAuthFields(g);
   }
@@ -573,7 +612,7 @@
     renderGrids();
     if (view === 'settings') { renderSettings(); return; }
     const g = curGrid();
-    if (g && g.kind === 'web') renderDashboard();
+    if (g && g.kind === 'web') { renderDashboard(); if (g.gridOn && dashTab === 'buttons') { renderTiles(); renderForm(); } }   // dashboard Buttons tab -> show the tile editor
     else if (g && g.kind === 'app') { renderAppPage(); const def = appDefs.find(a => a.id === g.app); if (def && def.grid) { renderTiles(); renderForm(); } }   // app with an embedded grid -> show the tile editor too
     else { renderMeta(); renderTiles(); renderForm(); }
   }
@@ -681,11 +720,11 @@
 
     el.innerHTML = `
       <p class="sectitle">Settings</p>
-      <div class="row" style="gap:6px; margin:0 0 6px">
-        <button id="tabSw" class="${tab === 'software' ? 'primary' : ''}">Software</button>
-        <button id="tabHw" class="${tab === 'hardware' ? 'primary' : ''}">Hardware</button>
-        <button id="tabTh" class="${tab === 'theme' ? 'primary' : ''}">Theme</button>
-        <button id="tabMon" class="${tab === 'monitor' ? 'primary' : ''}">Monitor</button>
+      <div class="tabbar">
+        <button id="tabSw" class="tab${tab === 'software' ? ' on' : ''}">Software</button>
+        <button id="tabHw" class="tab${tab === 'hardware' ? ' on' : ''}">Hardware</button>
+        <button id="tabTh" class="tab${tab === 'theme' ? ' on' : ''}">Theme</button>
+        <button id="tabMon" class="tab${tab === 'monitor' ? ' on' : ''}">Monitor</button>
       </div>
       ${tab === 'software' ? swHtml : tab === 'hardware' ? hwHtml : tab === 'theme' ? thHtml : monHtml}
       <div class="row" style="margin-top:22px"><button id="sBack">← Back to pages</button></div>`;

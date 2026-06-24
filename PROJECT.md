@@ -1,58 +1,55 @@
-# PROJECT — SystemView (open-quake system-monitor app)
+# PROJECT — Dashboard button-grid (macro tiles beside a web dashboard)
 
-A live PC system-performance dashboard for the DK-QUAKE panel — CPU/GPU, memory,
-disk, network, battery, and process state — styled for the 1920×480 screen.
+Let any web-dashboard page on the DK-QUAKE carry an optional native tile grid beside
+the live web view — so you can fire macro actions while a dashboard (Home Assistant,
+Audiobookshelf, Grafana…) fills the rest of the 1920×480 panel.
 
 ## Charter
 
 **1. What is the one thing this must do?**
-Show the **real, live state of this PC** on the panel — CPU & GPU load (and temp
-where available), RAM used/total, per-drive disk usage, network up/down, battery %,
-and process counts (running/blocked/sleeping) — refreshing continuously (~1 s).
+Show a real, tappable **tile grid alongside a live web dashboard** on the same page —
+the tiles run the same actions as a normal grid (app / URL / shell / page / system /
+counter / paste), while the dashboard keeps working in the remaining space.
 
 **2. What would be wrong if we shipped "working" software without it?**
-The numbers must be **real and live**. A beautiful dashboard showing static, fake,
-or `0`/placeholder values (like the source mockup's `0°C` / `0%`) is a failure — it
-must reflect what Task Manager / Resource Monitor would show, and update on its own.
+**Touch routing must be correct.** Taps in the grid strip launch their tiles; taps in
+the dashboard region reach the webview with correctly-offset coordinates; the knob still
+scrolls the dashboard. A dashboard with no grid must behave exactly as it does today.
 
 **3. What is explicitly off-limits as a workaround?**
-- No fake, hardcoded, or placeholder metrics — every value is read from the host.
-- No making the user type in their specs or hand-edit a data file.
-- No unsafe sandbox break — we do **not** turn on `nodeIntegration` for dashboards;
-  metrics reach the page through a controlled local feed, not host access in the webview.
-- Core metrics must work **without admin rights**. (CPU/GPU temperature may be
-  best-effort — see success criteria — but load/RAM/disk/net/battery/processes must not
-  require elevation.)
+- No injecting a grid into the dashboard's own HTML — that only works for our served
+  pages, never third-party sites (HA/ABS/Grafana). It must be a real **native** strip.
+- No regressing existing full-screen dashboards (grid off → unchanged).
+- No new privileged-webview access; the strip is host-rendered, the webview stays sandboxed.
 
 **4. Deployment target and backup location?**
 - Target: bundled into **open-quake** (Windows), shown on the DK-QUAKE panel.
 - Backup: the git repo at `D:\Github\open-quake` (snapshots cover it).
 
 **5. How will we verify it's done?**
-On the panel, SystemView shows and continuously updates:
-- CPU load %, RAM used/total, per-drive disk usage, network up/down, battery %,
-  process counts — each matching Task Manager / Resource Monitor within reason.
-- CPU/GPU **temperature**: real values where the OS/driver exposes them (e.g. NVIDIA
-  via `nvidia-smi`), and a graceful **"—"** where they aren't, never a fake `0°C`.
-- Survives being left up for minutes without stalling, leaking, or freezing the panel.
+On the panel:
+- A dashboard with a right-aligned 2×2 grid — tiles launch their actions, the dashboard
+  still scrolls/taps in its region, and the knob scrolls it.
+- Alignment (left/right) and size (1×2 / 2×2 / 3×2) both work.
+- A dashboard with the grid disabled is byte-for-byte the old behavior.
+- The editor's grid tab edits those tiles (icons included), reusing the normal tile editor.
 
-## Proposed approach (needs sign-off)
+## Approach (signed off)
 
-The app/dashboard webview is sandboxed (no host access by design), so the page can't
-read system metrics itself. Plan:
+- **Data model** — a `kind:'web'` page gains `gridOn`, `gridAlign` (`left`/`right`), and
+  reuses the grid schema's `cols`/`rows`/`tiles` (1×2/2×2/3×2 → cols×rows).
+- **Editor** — `renderDashboard()` gets an **"Add grid"** checkbox; when on, a 2nd tab holds
+  align + size + the tile editor (reusing `renderTiles`/`renderForm`, exactly like the Music
+  app's embedded grid at config.js:577).
+- **Push** — `resolveGridIcons` resolves the web page's grid tiles' icons (today it returns web
+  pages untouched) and passes `gridOn`/align/cols/rows/tiles to the panel.
+- **Panel** — when `gridOn`, shrink `#web` to a sub-rect and render the tile strip beside it
+  (strip width = cols × square-tile size ≈ cols×240 px on the 480-tall panel). Touch routing in
+  `onTouch`: tap in the strip → launch tile; otherwise → `webTouch` with x offset by the strip.
+  Knob keeps scrolling the dashboard region.
 
-1. **Metrics provider** in the main process using the [`systeminformation`](https://www.npmjs.com/package/systeminformation)
-   package (pure-JS for the core metrics; no native rebuild). Add as a dependency.
-2. **Tiny localhost server** in main that serves the SystemView page **and** a live
-   `/metrics` JSON (or SSE) feed on `127.0.0.1`.
-3. SystemView is shown as a **dashboard page** pointed at that localhost URL — reusing
-   the existing web-view model; no new privileged-webview code.
-4. **Temps are best-effort**: try `nvidia-smi` (NVIDIA GPU) and `systeminformation`'s
-   CPU temp; show "—" when unavailable rather than blocking the rest.
+## Build order (MVP-first)
 
-## Open decisions for sign-off
-- **Metric set** above — add/drop anything? (mockup also shows a per-process Run/Block/Sleep donut.)
-- **Temps**: ship best-effort now (real where available, "—" otherwise), or invest in a
-  bundled helper (LibreHardwareMonitor) for fuller temp coverage later?
-- **Port**: fixed local port (simplest) with a fallback if taken — OK?
-- Adding the `systeminformation` dependency to the repo — OK?
+1. **MVP** — right-aligned 2×2 strip: data flag + "Add grid" checkbox + tile editor reuse +
+   panel strip + touch routing. Verify on hardware (layout + routing are the risk).
+2. **Options** — alignment (left/right) + size (1×2/2×2/3×2) controls in a 2nd editor tab.

@@ -27,6 +27,10 @@
   #grid { display: grid; width: 1920px; height: 480px; gap: 10px; padding: 12px; box-sizing: border-box; }
   #web { position: absolute; top: 0; left: 0; width: 1920px; height: 480px; border: 0; background: var(--bg2); display: none; }
   #web.show { display: flex; }
+  /* button strip beside a dashboard (left/width set inline per page); tiles reuse the .tile styles */
+  #webgrid { position: absolute; top: 0; height: 480px; display: none; gap: 10px; padding: 12px; box-sizing: border-box;
+    background: radial-gradient(140% 200% at 0% 0%, var(--bg1) 0%, var(--bg2) 70%); }
+  #webgrid.show { display: grid; }
   .tile { display: flex; flex-direction: column; align-items: center; justify-content: center;
     border-radius: 18px; background: linear-gradient(160deg, var(--tile1), var(--tile2));
     border: 1px solid var(--tile-bd); color: var(--tile-fg); user-select: none;
@@ -81,6 +85,7 @@
   <div id="stage">
     <div id="grid"></div>
     <webview id="web" src="about:blank" partition="persist:dashboards"></webview>
+    <div id="webgrid"></div>
     <div id="vol">🔊</div>
     <div id="selector"><div class="seltitle">SELECT PAGE</div><div class="selwheel"><div id="selitems"></div></div><div class="selhint">rotate to choose · press to select</div></div>
     <div id="intro">

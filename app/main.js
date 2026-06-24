@@ -362,10 +362,8 @@ function sweepIconCache() {
   if (removed) console.log('icon cache: removed ' + removed + ' orphaned file(s)');
 }
 // Resolve app/image icons to a data: URL the panel renderer can draw (works in native + http pages).
-async function resolveGridIcons(grid) {
-  if (grid.kind === 'app') return { ...grid, kind: 'web', url: appPageUrl(grid), themed: true };   // render the local app in the webview; themed:true -> panel injects live light/dark + accent
-  if (grid.kind === 'web') return grid;   // dashboard page — no tiles to resolve
-  const tiles = await Promise.all((grid.tiles || []).map(async t => {
+async function resolveTiles(tiles) {
+  return Promise.all((tiles || []).map(async t => {
     const out = { ...t };
     if (t.iconType === 'image' && t.iconImage) {
       out.iconSrc = imageFileToDataUrl(t.iconImage);
@@ -375,7 +373,11 @@ async function resolveGridIcons(grid) {
     else if (t.iconType === 'app') { const d = await getAppIconDataUrl(t.value); if (d) out.iconSrc = d; }
     return out;
   }));
-  return { ...grid, tiles };
+}
+async function resolveGridIcons(grid) {
+  if (grid.kind === 'app') return { ...grid, kind: 'web', url: appPageUrl(grid), themed: true };   // render the local app in the webview; themed:true -> panel injects live light/dark + accent
+  if (grid.kind === 'web') return grid.gridOn ? { ...grid, tiles: await resolveTiles(grid.tiles) } : grid;   // dashboard: resolve the button-grid tile icons, else nothing to resolve
+  return { ...grid, tiles: await resolveTiles(grid.tiles) };
 }
 
 // Extract a program's own icon as a data: URL (best-effort; null if it can't be resolved).

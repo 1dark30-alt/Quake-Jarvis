@@ -1,5 +1,6 @@
   const panelApi = window.openQuakePanel;
   const grid = document.getElementById('grid'), vol = document.getElementById('vol'), web = document.getElementById('web');
+  const webgrid = document.getElementById('webgrid');   // button strip beside a dashboard
   const selector = document.getElementById('selector'), selitems = document.getElementById('selitems');
   const intro = document.getElementById('intro'), introok = document.getElementById('introok');
   let cfg = { cols: 8, rows: 2, tiles: [] };
@@ -9,6 +10,8 @@
   let webMode = false, curUrl = '', webReady = false, webDown = false, lastWeb = { x: 0, y: 0 }, webIdle = null;
   let haToken = '', haInject = false, webExternalLinks = false, webAttached = false, pendingWebUrl = null;
   let webThemed = false, lastTheme = null;   // our served app pages (Music/Chat): inject live light/dark + accent into the guest
+  // dashboard button strip: webRegion = the webview's sub-rect, webStrip = the tile-strip geometry (null = none)
+  let webRegion = { left: 0, width: 1920 }, webStrip = null, stripArmed = false, stripIdleT = null, stripLastHit = -1;
   // The <webview> can't be navigated until its first dom-ready — a programmatic src set during the
   // initial about:blank load is silently dropped. Gate the first dashboard navigation on that, so a
   // dashboard set as the start page actually loads instead of sitting on about:blank (a black panel).
@@ -16,7 +19,7 @@
   // inside an embedded webview. Spoofing a desktop-Chrome UA (changes navigator.userAgent too, not just
   // the header — that's what bot checks read) makes them treat the panel as a real browser. defaultUA is
   // captured at first attach, before any override, so a non-spoof page resets cleanly.
-  const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+  const DESKTOP_UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36';
   let defaultUA = '', pendingDesktop = false, webDesktop = false;
   function setUA(desktop) { const ua = desktop ? DESKTOP_UA : defaultUA; try { if (ua) web.setUserAgent(ua); } catch (e) {} }
   function navWeb(url, desktop) {
@@ -90,38 +93,58 @@
   layoutStage();
 
   // ---- active grid ----
+  // Build one tile element (shared by the main grid and the dashboard button strip).
+  function makeTile(t, i, cols) {
+    const col = i % cols, row = Math.floor(i / cols);
+    const w = (t && t.w) || 1, h = (t && t.h) || 1;
+    const d = document.createElement('div');
+    const empty = !t || !t.type;
+    d.className = 'tile' + (empty ? ' empty' : '') + ((w > 1 || h > 1) ? ' span' : '');
+    d.dataset.i = i;
+    d.style.gridColumn = `${col + 1} / span ${w}`;
+    d.style.gridRow = `${row + 1} / span ${h}`;
+    if (t && t.type === 'counter') {
+      // DOM-build everything (no innerHTML for label/value) so a config-supplied label can't inject markup
+      const wrap = document.createElement('div'); wrap.className = 'tile-counter';
+      const bMinus = document.createElement('button'); bMinus.className = 'btn-minus'; bMinus.textContent = '-';
+      const center = document.createElement('div'); center.className = 'counter-center';
+      const title = document.createElement('div'); title.className = 'title'; title.textContent = t.label || '';
+      const val = document.createElement('span'); val.className = 'val'; val.textContent = String(parseInt(t.value) || 0);
+      center.appendChild(title); center.appendChild(val);
+      const bPlus = document.createElement('button'); bPlus.className = 'btn-plus'; bPlus.textContent = '+';
+      wrap.appendChild(bMinus); wrap.appendChild(center); wrap.appendChild(bPlus);
+      d.appendChild(wrap);
+    } else if (!empty) {                                       // build via DOM nodes (never innerHTML) so a config-supplied label/icon can't inject markup
+      if (t.iconSrc) { const im = document.createElement('img'); im.className = 'ic-img'; im.src = t.iconSrc; d.appendChild(im); }
+      else { const icd = document.createElement('div'); icd.className = 'ic'; icd.textContent = t.icon || '▫️'; d.appendChild(icd); }
+      const lb = document.createElement('div'); lb.className = 'lb'; lb.textContent = t.label || ''; d.appendChild(lb);
+    }
+    return d;
+  }
   function build() {
     grid.style.gridTemplateColumns = `repeat(${cfg.cols},1fr)`;
     grid.style.gridTemplateRows = `repeat(${cfg.rows},1fr)`;
     grid.innerHTML = '';
-    cfg.tiles.forEach((t, i) => {
-      if (t && t.cover != null) return;                        // covered by a merged tile
-      const col = i % cfg.cols, row = Math.floor(i / cfg.cols);
-      const w = (t && t.w) || 1, h = (t && t.h) || 1;
-      const d = document.createElement('div');
-      const empty = !t || !t.type;
-      d.className = 'tile' + (empty ? ' empty' : '') + ((w > 1 || h > 1) ? ' span' : '');
-      d.dataset.i = i;
-      d.style.gridColumn = `${col + 1} / span ${w}`;
-      d.style.gridRow = `${row + 1} / span ${h}`;
-      if (t && t.type === 'counter') {
-        // DOM-build everything (no innerHTML for label/value) so a config-supplied label can't inject markup
-        const wrap = document.createElement('div'); wrap.className = 'tile-counter';
-        const bMinus = document.createElement('button'); bMinus.className = 'btn-minus'; bMinus.textContent = '-';
-        const center = document.createElement('div'); center.className = 'counter-center';
-        const title = document.createElement('div'); title.className = 'title'; title.textContent = t.label || '';
-        const val = document.createElement('span'); val.className = 'val'; val.textContent = String(parseInt(t.value) || 0);
-        center.appendChild(title); center.appendChild(val);
-        const bPlus = document.createElement('button'); bPlus.className = 'btn-plus'; bPlus.textContent = '+';
-        wrap.appendChild(bMinus); wrap.appendChild(center); wrap.appendChild(bPlus);
-        d.appendChild(wrap);
-      } else if (!empty) {                                       // build via DOM nodes (never innerHTML) so a config-supplied label/icon can't inject markup
-        if (t.iconSrc) { const im = document.createElement('img'); im.className = 'ic-img'; im.src = t.iconSrc; d.appendChild(im); }
-        else { const icd = document.createElement('div'); icd.className = 'ic'; icd.textContent = t.icon || '▫️'; d.appendChild(icd); }
-        const lb = document.createElement('div'); lb.className = 'lb'; lb.textContent = t.label || ''; d.appendChild(lb);
-      }
-      grid.appendChild(d);
-    });
+    cfg.tiles.forEach((t, i) => { if (t && t.cover != null) return; grid.appendChild(makeTile(t, i, cfg.cols)); });   // skip cells covered by a merged tile
+  }
+  // Render the dashboard button strip into #webgrid and size/place it; resize the webview to the rest.
+  function buildStrip(g) {
+    const cols = g.cols || 2, rows = g.rows || 2;
+    const stripW = Math.min(1100, Math.round(cols * (480 / rows)));   // square tiles; cap so the dashboard keeps room
+    const left = g.gridAlign === 'left';
+    webRegion = { left: left ? stripW : 0, width: 1920 - stripW };
+    webStrip = { left: left ? 0 : 1920 - stripW, w: stripW, cols, rows };
+    web.style.left = webRegion.left + 'px'; web.style.width = webRegion.width + 'px';
+    webgrid.style.left = webStrip.left + 'px'; webgrid.style.width = stripW + 'px';
+    webgrid.style.gridTemplateColumns = `repeat(${cols},1fr)`;
+    webgrid.style.gridTemplateRows = `repeat(${rows},1fr)`;
+    webgrid.innerHTML = '';
+    (g.tiles || []).forEach((t, i) => { if (t && t.cover != null) return; webgrid.appendChild(makeTile(t, i, cols)); });
+    webgrid.classList.add('show');
+  }
+  function hideStrip() {   // full-screen webview again
+    webStrip = null; webRegion = { left: 0, width: 1920 };
+    web.style.left = '0'; web.style.width = '1920px'; webgrid.classList.remove('show');
   }
   panelApi.onGrid(g => {
     cfg = g;
@@ -147,8 +170,10 @@
           curUrl = url; webDesktop = desktop; webReady = false; haInject = !!haToken; navWeb(url, desktop);
         }
       }
+      if (g.gridOn && (g.tiles || []).length) buildStrip(g); else hideStrip();   // optional button strip beside the dashboard
     } else {                                // tile grid
       webMode = false; web.classList.remove('show'); grid.style.display = 'grid'; build();
+      hideStrip();
     }
   });
   panelApi.onTheme(t => {
@@ -184,7 +209,10 @@
     if (introOpen) { if (pts.some(p => p.action === 1)) dismissIntro(); return; }   // any tap dismisses the intro
     if (selOpen) return; // ignore touch while picking a page
     const p = pts.find(p => p.action === 1) || pts[0]; if (!p) return;
-    if (webMode) return webTouch(p);        // dashboard: forward as mouse to the webview
+    if (webMode) {                          // dashboard: strip taps launch tiles, the rest forwards to the webview
+      if (webStrip && p.x >= webStrip.left && p.x < webStrip.left + webStrip.w) return stripTouch(p);
+      return webTouch(p);
+    }
     const i = tileAt(p.x, 480 - p.y);
     if (i >= 0 && cfg.tiles[i] && cfg.tiles[i].type === 'counter') {
       if (p.action === 1) {
@@ -225,11 +253,31 @@
     panelApi.launch(cfg.tiles[i]);
     setTimeout(() => highlight(-1), 180);
   });
+  // PC mouse on the dashboard button strip (the strip overlays the webview region, so it gets its own handler)
+  webgrid.addEventListener('click', (e) => {
+    if (selOpen || !webStrip) return;
+    const el = e.target.closest && e.target.closest('[data-i]');
+    if (!el) return;
+    const i = parseInt(el.dataset.i, 10);
+    if (i < 0 || !cfg.tiles[i] || !cfg.tiles[i].type) return;
+    if (cfg.tiles[i].type === 'counter') {
+      const rect = el.getBoundingClientRect();
+      const isMinus = (e.clientX - rect.left) < rect.width / 2;
+      const btn = el.querySelector(isMinus ? '.btn-minus' : '.btn-plus');
+      if (btn) { btn.classList.add('btn-hit'); setTimeout(() => btn.classList.remove('btn-hit'), 150); }
+      updateCounter(i, isMinus ? -1 : 1);
+      return;
+    }
+    stripHighlight(i);
+    panelApi.launch(cfg.tiles[i]);
+    setTimeout(() => stripHighlight(-1), 180);
+  });
 
   // ---- dashboard touch -> mouse (tap = click, drag = move) ----
   function webTouch(p) {
     if (!webReady) return;
-    const x = Math.max(0, Math.min(1920, p.x)), y = Math.max(0, Math.min(480, 480 - p.y));
+    // map panel x into the webview's own coordinate space (it may be inset by a button strip)
+    const x = Math.max(0, Math.min(webRegion.width, p.x - webRegion.left)), y = Math.max(0, Math.min(480, 480 - p.y));
     lastWeb = { x, y }; clearTimeout(webIdle);
     try {
       if (p.action === 1) {
@@ -242,6 +290,38 @@
   function webRelease() {
     clearTimeout(webIdle);
     if (webDown) { webDown = false; try { web.sendInputEvent({ type: 'mouseUp', x: lastWeb.x, y: lastWeb.y, button: 'left', clickCount: 1 }); } catch (e) {} }
+  }
+
+  // ---- dashboard button strip: a tap in the strip launches its tile (mirrors the main grid touch path) ----
+  function stripHighlight(i) {
+    if (i === stripLastHit) return;
+    if (stripLastHit >= 0) { const p = webgrid.querySelector(`[data-i="${stripLastHit}"]`); if (p) p.classList.remove('hit'); }
+    if (i >= 0 && cfg.tiles[i] && cfg.tiles[i].type) { const el = webgrid.querySelector(`[data-i="${i}"]`); if (el) el.classList.add('hit'); }
+    stripLastHit = i;
+  }
+  function stripTouch(p) {
+    if (!webStrip) return;
+    const sy = 480 - p.y, lx = p.x - webStrip.left;
+    const tileW = webStrip.w / webStrip.cols, tileH = 480 / webStrip.rows;
+    const col = Math.floor(lx / tileW), row = Math.floor(sy / tileH);
+    if (col < 0 || col >= webStrip.cols || row < 0 || row >= webStrip.rows) return;
+    let idx = row * webStrip.cols + col;
+    let t = cfg.tiles[idx];
+    if (t && t.cover != null) { idx = t.cover; t = cfg.tiles[idx]; }   // covered cell -> its merged owner
+    if (!t || !t.type) return;
+    if (t.type === 'counter') {
+      if (p.action === 1) {
+        const isMinus = (lx % tileW) < tileW / 2;
+        const el = webgrid.querySelector(`[data-i="${idx}"]`);
+        if (el) { const btn = el.querySelector(isMinus ? '.btn-minus' : '.btn-plus'); if (btn) { btn.classList.add('btn-hit'); setTimeout(() => btn.classList.remove('btn-hit'), 150); } }
+        if (!counterLocked) { counterLocked = true; updateCounter(idx, isMinus ? -1 : 1); setTimeout(() => { counterLocked = false; }, 150); }
+      }
+      return;
+    }
+    stripHighlight(idx);
+    if (!stripArmed && p.action === 1) { stripArmed = true; panelApi.launch(t); }
+    clearTimeout(stripIdleT);
+    stripIdleT = setTimeout(() => { stripArmed = false; stripHighlight(-1); }, 180);
   }
 
   // ---- dial selector ----
@@ -291,7 +371,7 @@
       else if (webMode && webReady) {
         // Native wheel event at center: Chromium routes it to whatever element is scrollable
         // under that point, so inner scroll containers (Grafana/HA panels) scroll too.
-        try { web.sendInputEvent({ type: 'mouseWheel', x: 960, y: 240, deltaX: 0, deltaY: k.dir > 0 ? -120 : 120, wheelTicksX: 0, wheelTicksY: k.dir > 0 ? -1 : 1, hasPreciseScrollingDeltas: true, canScroll: true }); } catch (e) {}
+        try { web.sendInputEvent({ type: 'mouseWheel', x: Math.round(webRegion.width / 2), y: 240, deltaX: 0, deltaY: k.dir > 0 ? -120 : 120, wheelTicksX: 0, wheelTicksY: k.dir > 0 ? -1 : 1, hasPreciseScrollingDeltas: true, canScroll: true }); } catch (e) {}
       }
       else { panelApi.volume(k.dir > 0 ? 1 : -1); flashVol(k.dir > 0 ? '🔊 +' : '🔉 −'); }
       return;
@@ -308,7 +388,8 @@
     if (!t) return;
     const count = (parseInt(t.value) || 0) + delta;
     t.value = String(count);
-    const el = grid.querySelector(`[data-i="${idx}"] .val`);
+    const host = (webMode && webStrip) ? webgrid : grid;   // a counter can live in the dashboard strip too
+    const el = host.querySelector(`[data-i="${idx}"] .val`);
     if (el) el.textContent = String(count);
     console.log('[counter] updateCounter: cfg.id=', JSON.stringify(cfg.id), 'idx=', idx, 'count=', count);
     panelApi.saveTileValue(cfg.id, idx, String(count));
