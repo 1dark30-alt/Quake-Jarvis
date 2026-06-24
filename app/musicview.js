@@ -69,7 +69,7 @@
       .catch(function(){ $('recon').classList.add('show'); });
   }
   function pollGrid(){
-    fetch('/musictiles', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(renderGrid).catch(function(){});
+    fetch('/grid-tiles', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(renderGrid).catch(function(){});
   }
   pollNP(); pollGrid();
   setInterval(pollNP, 1500);

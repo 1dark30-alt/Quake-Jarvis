@@ -9,9 +9,10 @@
  * Routes:
  *   GET /            -> SystemView page        GET /metrics      -> system metrics JSON
  *   GET /music       -> Music app page         GET /nowplaying   -> SMTC now-playing JSON
- *   GET /musictiles  -> the active Music page's embedded 2x2 grid (resolved icons)
+ *   GET /agenda /events -> the Agenda/Events dev apps (list + embedded grid; reuse /haschedule-data)
+ *   GET /grid-tiles  -> the active app page's embedded grid (resolved icons) — Music/Agenda/Events
  *   GET /media/<cmd> -> transport (play/pause/next/prev) via onMedia
- *   GET /launch?i=N  -> launch the active Music grid's tile N via onLaunch (runAction)
+ *   GET /launch?i=N  -> launch the active app grid's tile N via onLaunch (runAction)
  */
 const http = require('http');
 const fs = require('fs');
@@ -49,10 +50,12 @@ const STATIC_FILES = {
   '/chatview-main.js': 'application/javascript; charset=utf-8',
   '/chatview-ptt.js': 'application/javascript; charset=utf-8',
   '/haschedule-ui.js': 'application/javascript; charset=utf-8',
+  '/schedule.css': 'text/css; charset=utf-8',
+  '/schedule-app.js': 'application/javascript; charset=utf-8',
 };
 
-let server = null, onMedia = null, onLaunch = null, getMusicTiles = null, getAppConfig = null;
-let sysHtml = FALLBACK, musicHtml = FALLBACK, chatHtml = FALLBACK, hascheduleHtml = FALLBACK;
+let server = null, onMedia = null, onLaunch = null, getGridTiles = null, getAppConfig = null;
+let sysHtml = FALLBACK, musicHtml = FALLBACK, chatHtml = FALLBACK, hascheduleHtml = FALLBACK, agendaHtml = FALLBACK, eventsHtml = FALLBACK;
 const staticAssets = {};   // request path -> { body, type }; populated at start()
 
 function headers(type) { return { 'Content-Type': type, 'Cache-Control': 'no-store', 'Content-Security-Policy': LOCAL_APP_CSP }; }
@@ -91,6 +94,8 @@ async function handler(req, res) {
   if (url === '/music') return html(res, musicHtml);
   if (url === '/chat') return html(res, chatHtml);
   if (url === '/haschedule') return html(res, hascheduleHtml);
+  if (url === '/agenda') return html(res, agendaHtml);
+  if (url === '/events') return html(res, eventsHtml);
   const asset = staticAssets[url];
   if (asset) { res.writeHead(200, headers(asset.type)); return res.end(asset.body); }
   // Below here: side effects (/launch, /media), live data (/metrics, /nowplaying, /musictiles), or
@@ -105,9 +110,9 @@ async function handler(req, res) {
   if (url === '/metrics') return json(res, metrics.getSnapshot());
   if (url === '/nowplaying') return json(res, nowplaying.getSnapshot());
   if (url === '/haschedule-data') return json(res, haschedule.getSnapshot());
-  if (url === '/musictiles') {
+  if (url === '/grid-tiles') {
     let t = { cols: 2, rows: 2, tiles: [] };
-    if (getMusicTiles) { try { t = await getMusicTiles(); } catch (e) {} }
+    if (getGridTiles) { try { t = await getGridTiles(); } catch (e) {} }
     return json(res, t);
   }
   if (url.indexOf('/media/') === 0) {
@@ -125,14 +130,14 @@ async function handler(req, res) {
   res.writeHead(404); res.end();
 }
 
-// opts: { onMedia(cmd), onLaunch(i), getMusicTiles(), getAppConfig(appId), getNowPlaying() } — all optional.
+// opts: { onMedia(cmd), onLaunch(i), getGridTiles(), getAppConfig(appId), getNowPlaying() } — all optional.
 // getNowPlaying is an async now-playing source (e.g. the Spotify Web API client on macOS); when given,
 // it becomes the now-playing provider and replaces the win32 SMTC poll (see nowplaying.setProvider).
 function start(opts) {
   opts = opts || {};
   onMedia = opts.onMedia || null;
   onLaunch = opts.onLaunch || null;
-  getMusicTiles = opts.getMusicTiles || null;
+  getGridTiles = opts.getGridTiles || null;
   getAppConfig = opts.getAppConfig || null;
   nowplaying.setProvider(opts.getNowPlaying || null);
   return new Promise((resolve, reject) => {
@@ -141,6 +146,8 @@ function start(opts) {
     try { musicHtml = fs.readFileSync(path.join(__dirname, 'musicview.html'), 'utf8'); } catch (e) {}
     try { chatHtml = fs.readFileSync(path.join(__dirname, 'chatview.html'), 'utf8'); } catch (e) {}
     try { hascheduleHtml = fs.readFileSync(path.join(__dirname, 'haschedule.html'), 'utf8'); } catch (e) {}
+    try { agendaHtml = fs.readFileSync(path.join(__dirname, 'agenda.html'), 'utf8'); } catch (e) {}
+    try { eventsHtml = fs.readFileSync(path.join(__dirname, 'events.html'), 'utf8'); } catch (e) {}
     for (const [route, type] of Object.entries(STATIC_FILES)) {
       try { staticAssets[route] = { body: fs.readFileSync(path.join(__dirname, route.slice(1)), 'utf8'), type }; } catch (e) {}
     }

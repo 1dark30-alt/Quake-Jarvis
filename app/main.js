@@ -14,6 +14,7 @@ const { createMediaKeys } = require('./mediaKeys');
 const { createSecretStore } = require('./secretStore');
 const nowplaying = require('./nowplaying');   // same singleton sysserver polls — read its snapshot to target transport
 const haschedule = require('./haschedule');   // HA Schedule dev app — fed HA creds from .env, polled while shown
+const HA_SCHEDULE_APPS = ['haschedule', 'agenda', 'events'];   // dev apps backed by the shared HA /haschedule-data snapshot
 
 const USER_DIR = app.getPath('userData');
 const CONFIG_PATH = path.join(USER_DIR, 'config.json');                  // writable — works inside a packaged app too
@@ -138,17 +139,17 @@ function ensureMusicPage() {
   }
   saveConfig();
 }
-// The Music app's embedded grid is served to the page (resolved icons) and its taps launched, both
-// keyed to whichever music page is currently shown.
-async function getMusicTiles() {
+// An app's embedded grid (Music, Agenda, Events, …) is served to the page (resolved icons) and its taps
+// launched — generic across any app that defines a grid, keyed to whichever app page is currently shown.
+async function getActiveAppTiles() {
   const g = activeGrid();
-  if (!(g && g.kind === 'app' && g.app === 'music')) return { cols: 2, rows: 2, tiles: [] };
+  if (!(g && g.kind === 'app' && Array.isArray(g.tiles) && g.cols && g.rows)) return { cols: 2, rows: 2, tiles: [] };
   const resolved = await resolveGridIcons(Object.assign({}, g, { kind: 'grid' }));   // resolve icons (force the tile path)
-  return { cols: g.cols || 2, rows: g.rows || 2, tiles: resolved.tiles || [] };
+  return { cols: g.cols, rows: g.rows, tiles: resolved.tiles || [] };
 }
-function onMusicLaunch(i) {
+function onAppLaunch(i) {
   const g = activeGrid();
-  if (g && g.kind === 'app' && g.app === 'music' && g.tiles && g.tiles[i]) { runAction(g.tiles[i]); return true; }
+  if (g && g.kind === 'app' && g.tiles && g.tiles[i]) { runAction(g.tiles[i]); return true; }
   return false;
 }
 function hostMatches(a, b) { try { return new URL(a).host === new URL(b).host; } catch (e) { return false; } }
@@ -230,7 +231,8 @@ function appPageUrl(page) {
   }
   const file = path.join(APPS_DIR, def.file);
   const opts = page.options || {};
-  const hash = [appOptionQuery(def, opts, o => o.type !== 'secret'), themeParams(page)].filter(Boolean).join('&');
+  const gridHint = page.gridOn ? '_grid=1' : '';   // lets the page (e.g. a clock) make room for the native button strip
+  const hash = [appOptionQuery(def, opts, o => o.type !== 'secret'), themeParams(page), gridHint].filter(Boolean).join('&');
   return pathToFileURL(file).href + (hash ? '#' + hash : '');
 }
 function activeServedAppConfig(appId) {
@@ -263,9 +265,10 @@ function syncPollers(g) {
     : (g && g.kind === 'app' && g.app === 'music') ? 'music'
     : null;
   try { sysserver.setActivePage(which); } catch (e) {}
-  // HA Schedule dev app: poll HA only while it's shown, at the page's chosen interval (default 10 min).
+  // HA-backed dev apps (HA Schedule / Agenda / Events): poll HA only while one is shown, at the page's
+  // chosen interval (default 10 min). They share one snapshot, so any of them drives the same poll.
   try {
-    if (!monitorMode && g && g.kind === 'app' && g.app === 'haschedule') haschedule.start((parseInt((g.options || {}).interval, 10) || 600) * 1000);
+    if (!monitorMode && g && g.kind === 'app' && HA_SCHEDULE_APPS.includes(g.app)) haschedule.start((parseInt((g.options || {}).interval, 10) || 600) * 1000);
     else haschedule.stop();
   } catch (e) {}
 }
@@ -394,7 +397,10 @@ async function resolveTiles(tiles) {
   }));
 }
 async function resolveGridIcons(grid) {
-  if (grid.kind === 'app') return { ...grid, kind: 'web', url: appPageUrl(grid), themed: true };   // render the local app in the webview; themed:true -> panel injects live light/dark + accent
+  if (grid.kind === 'app') {                                                                         // render the local app in the webview; themed:true -> panel injects live light/dark + accent
+    const base = { ...grid, kind: 'web', url: appPageUrl(grid), themed: true };
+    return grid.gridOn ? { ...base, tiles: await resolveTiles(grid.tiles) } : base;                  // file/app pages with the native button strip -> resolve its tile icons
+  }
   if (grid.kind === 'web') return grid.gridOn ? { ...grid, tiles: await resolveTiles(grid.tiles) } : grid;   // dashboard: resolve the button-grid tile icons, else nothing to resolve
   return { ...grid, tiles: await resolveTiles(grid.tiles) };
 }
@@ -751,7 +757,7 @@ app.whenReady().then(async () => {
   // Lazy-required so a metrics/load failure can never crash the rest of the app.
   try {
     sysserver = require('./sysserver');
-    serverPort = await sysserver.start({ onMedia: mediaKey, onLaunch: onMusicLaunch, getMusicTiles, getAppConfig: activeServedAppConfig });
+    serverPort = await sysserver.start({ onMedia: mediaKey, onLaunch: onAppLaunch, getGridTiles: getActiveAppTiles, getAppConfig: activeServedAppConfig });
     ensureSystemViewPage(serverPort); ensureMusicPage();
     const env = loadEnv(); haschedule.configure({ url: env.HA_URL, token: env.HA_TOKEN });   // HA Schedule dev app creds
     console.log('SystemView + Music on http://127.0.0.1:' + serverPort + (env.HA_URL ? ' · HA Schedule -> ' + env.HA_URL : ''));
@@ -831,7 +837,22 @@ app.whenReady().then(async () => {
     const r = await dialog.showOpenDialog(configWin, { properties: ['openFile'], filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'ico', 'svg'] }, { name: 'All Files', extensions: ['*'] }] });
     return (r.canceled || !r.filePaths.length) ? null : r.filePaths[0];
   });
+  // For "Open file/folder" tiles: a plain file picker (any file) and a folder picker. Windows can't show
+  // both in one dialog, so the editor offers two buttons.
+  ipcMain.handle('pickFile', async (e) => {
+    if (!isFrom(e, configWin)) return null;
+    const r = await dialog.showOpenDialog(configWin, { properties: ['openFile'], filters: [{ name: 'All Files', extensions: ['*'] }] });
+    return (r.canceled || !r.filePaths.length) ? null : r.filePaths[0];
+  });
+  ipcMain.handle('pickFolder', async (e) => {
+    if (!isFrom(e, configWin)) return null;
+    const r = await dialog.showOpenDialog(configWin, { properties: ['openDirectory'] });
+    return (r.canceled || !r.filePaths.length) ? null : r.filePaths[0];
+  });
   ipcMain.handle('getAppIcon', (e, value) => isFrom(e, configWin) ? getAppIconDataUrl(value) : null);
+  // Sync: editor preview reads a local image as a data: URL through main (the config preload is sandboxed,
+  // so it can't touch fs). Same conversion the panel uses, so editor previews match the panel.
+  ipcMain.on('imageToDataUrl', (e, filePath) => { e.returnValue = isFrom(e, configWin) ? (imageFileToDataUrl(filePath) || '') : ''; });
   ipcMain.handle('fetchIconUrl', (e, url) => isFrom(e, configWin) ? fetchIconToCache(url) : { ok: false, error: 'unauthorized' });
 
   ipcMain.handle('saveLightingToDevice', (e) => { if (!isFrom(e, configWin)) return false; try { return dev.saveLighting(); } catch (er) { return false; } });

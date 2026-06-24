@@ -44,7 +44,8 @@
     b.textContent = show ? '🙈' : '👁';
   });
   const fileUrl = p => configApi.pathToFileURL(p);
-  const urlSrc = t => urlIconPreview[t.iconCache] || fileUrl(t.iconCache);   // URL-icon source: fresh fetch preview, else the cached file
+  const imgUrl = p => configApi.imageToDataUrl(p) || configApi.pathToFileURL(p);   // data: URL like the panel; file:// fallback
+  const urlSrc = t => urlIconPreview[t.iconCache] || imgUrl(t.iconCache);   // URL-icon source: fresh-fetch preview, else the cached file as a data: URL (matches the panel)
   const baseName = p => p.split(/[\\/]/).pop().replace(/\.(exe|lnk|bat|cmd|com)$/i, '');
   const iconTypeOf = t => t.iconType || 'emoji';
 
@@ -104,7 +105,21 @@
         <label class="iconopt" style="width:auto"><input type="checkbox" id="gAccOn" ${hasAcc ? 'checked' : ''}> Override</label>
         <input type="color" id="gAcc" value="${hasAcc ? esc(g.accent) : '#7CFFB2'}" style="width:48px;height:28px;padding:2px;margin-left:8px" ${hasAcc ? '' : 'disabled'}></div>
       <p class="hint">When checked, this page overrides the global theme. (Web dashboards follow the global light/dark only.)</p>
+      ${advCloneHtml(g)}
     </details>`;
+  }
+  // Clone-grid control: on an app page that has an embedded grid, copy another page's grid tiles in.
+  function advCloneHtml(g) {
+    if (!(g.kind === 'app' && hasGrid(g))) return '';
+    const srcs = gridSources(g);
+    const tagOf = p => p.kind === 'web' ? '🌐' : p.kind === 'app' ? '🧩' : '▦';
+    return `<div class="row" style="margin-top:10px"><label style="width:auto">Clone grid</label>
+        <select id="gClone" style="width:180px">
+          <option value="">${srcs.length ? '— from another page —' : '— no other grids —'}</option>
+          ${srcs.map(p => `<option value="${esc(p.id)}">${tagOf(p)} ${esc(p.name || '(unnamed)')}</option>`).join('')}
+        </select>
+        <button id="gCloneBtn" style="margin-left:8px" disabled>Clone</button></div>
+      <p class="hint">Copies another page's grid tiles into this one, fit to this grid's size. Replaces the current tiles.</p>`;
   }
   function wireAdvRow(g) {
     const aprOn = document.getElementById('gAprOn'), apr = document.getElementById('gApr');
@@ -117,6 +132,17 @@
       accOn.onchange = e => { if (e.target.checked) g.accent = acc.value; else delete g.accent; acc.disabled = !e.target.checked; markDirty(); };
       acc.oninput = e => { if (accOn.checked) { g.accent = e.target.value; markDirty(); } };
     }
+    const clone = document.getElementById('gClone'), cloneBtn = document.getElementById('gCloneBtn');
+    if (clone && cloneBtn) {
+      clone.onchange = () => { cloneBtn.disabled = !clone.value; };
+      cloneBtn.onclick = () => {
+        const src = config.grids.find(p => p.id === clone.value); if (!src) return;
+        const hasContent = (g.tiles || []).some(t => t && t.type);
+        if (hasContent && !window.confirm('Replace this grid’s tiles with the ones from “' + (src.name || 'that page') + '”?')) return;
+        g.tiles = fitTiles(src.tiles, (g.cols || 1) * (g.rows || 1));
+        ti = -1; selEnd = -1; render(); markDirty();
+      };
+    }
   }
 
   // ---- save model (no live edit) ----
@@ -127,6 +153,36 @@
   // ---- tiles / icons ----
   function blankTile() { return { label: '', icon: '', type: '', value: '', iconType: 'emoji', iconImage: '', iconUrl: '', iconCache: '' }; }
   function ensureTiles(g) { const need = g.cols * g.rows; while (g.tiles.length < need) g.tiles.push(blankTile()); g.tiles.length = need; }
+  // A page carries a tile grid if it has tiles + dimensions: normal grids, app pages with an embedded
+  // grid (def.grid), and dashboards with the button grid on.
+  function hasGrid(g) { return !!(g && Array.isArray(g.tiles) && +g.cols > 0 && +g.rows > 0); }
+  // Other pages whose grid has at least one real tile — the candidates to clone a grid FROM.
+  function gridSources(g) { return config.grids.filter(p => p.id !== g.id && hasGrid(p) && (p.tiles || []).some(t => t && t.type)); }
+  // Copy a tile list into an n-slot grid: take the first n (deep-copied), pad the rest with blanks.
+  function fitTiles(tiles, n) { const out = (tiles || []).slice(0, n).map(t => Object.assign({}, t)); while (out.length < n) out.push(blankTile()); return out; }
+  // 2×{1,2,3} button-grid editor bits, shared by dashboards and grid-capable apps so EVERY page exposes the
+  // same side + size options. Default is 2×3 (cols 3 × rows 2).
+  function enableGrid(g) {
+    if (typeof g.cols !== 'number') g.cols = 3;
+    if (typeof g.rows !== 'number') g.rows = 2;
+    if (!Array.isArray(g.tiles)) g.tiles = [];
+    if (!g.gridAlign) g.gridAlign = 'right';
+    ensureTiles(g);
+  }
+  function gridSizeRowHtml(g) {
+    const cols = g.cols || 3;
+    return `<div class="row"><label style="width:auto">Side</label><select id="gAlign">
+        <option value="right" ${g.gridAlign !== 'left' ? 'selected' : ''}>Right</option>
+        <option value="left" ${g.gridAlign === 'left' ? 'selected' : ''}>Left</option></select>
+      <label style="width:auto; margin-left:16px">Size</label><select id="gSize">
+        <option value="1" ${cols === 1 ? 'selected' : ''}>2×1</option>
+        <option value="2" ${cols === 2 ? 'selected' : ''}>2×2</option>
+        <option value="3" ${cols === 3 ? 'selected' : ''}>2×3</option></select></div>`;
+  }
+  function wireGridSizeRow(g) {
+    const al = document.getElementById('gAlign'); if (al) al.onchange = e => { g.gridAlign = e.target.value === 'left' ? 'left' : 'right'; markDirty(); };
+    const sz = document.getElementById('gSize'); if (sz) sz.onchange = e => { clearAllMerges(g); g.cols = Math.max(1, Math.min(3, +e.target.value || 3)); g.rows = 2; ensureTiles(g); ti = -1; selEnd = -1; render(); markDirty(); };
+  }
   // App-picker visibility (Settings -> Apps). Regular apps default SHOWN (listed in hiddenApps when off);
   // developer apps (apps.json "dev": true) default HIDDEN (listed in shownDevApps when ticked) so releases hide them.
   // devEnabled() is just a UI toggle that reveals the developer list in the editor — it doesn't affect the picker.
@@ -144,7 +200,7 @@
   // icon HTML for a tile in a given context: 'cell' (grid preview) or 'prev' (big preview)
   function iconHtml(t, ctx) {
     const type = iconTypeOf(t);
-    if (type === 'image' && t.iconImage) return `<img class="${ctx === 'cell' ? 'cimg' : ''}" src="${esc(fileUrl(t.iconImage))}">`;
+    if (type === 'image' && t.iconImage) return `<img class="${ctx === 'cell' ? 'cimg' : ''}" src="${esc(imgUrl(t.iconImage))}">`;
     if (type === 'url' && t.iconCache) return `<img class="${ctx === 'cell' ? 'cimg' : ''}" src="${esc(urlSrc(t))}">`;
     if (type === 'app' && t.value) {
       const c = appIconCache[t.value];
@@ -335,7 +391,11 @@
       <div class="row"><label>Type</label><select id="tType">${TYPES.map(([v, n]) => `<option value="${v}" ${v === (t.type || '') ? 'selected' : ''}>${n}</option>`).join('')}</select></div>
       <div class="row"><label>${t.type === 'page' ? 'Page' : 'Value'}</label>${t.type === 'page'
         ? pageSelectHtml(t)
-        : `<input id="tValue" value="${esc(t.value)}" placeholder="${valuePlaceholder(t.type)}"><button id="tBrowse" ${t.type === 'app' || t.type === 'open' ? '' : 'style="display:none"'}>Browse…</button>`}</div>
+        : `<input id="tValue" value="${esc(t.value)}" placeholder="${valuePlaceholder(t.type)}">${t.type === 'app'
+          ? '<button id="tBrowse">Browse…</button>'
+          : t.type === 'open'
+          ? '<button id="tBrowseFile">File…</button><button id="tBrowseFolder">Folder…</button>'
+          : ''}`}</div>
       <div class="row"><button class="danger" id="tClear">Clear tile</button></div>
       <p class="hint">${typeHint(t.type)}</p>
     </div>`;
@@ -346,8 +406,13 @@
     const tp = document.getElementById('tPage');
     if (tp) { if (tp.value && tp.value !== t.value) { t.value = tp.value; markDirty(); } tp.onchange = e => { t.value = e.target.value; renderTiles(); markDirty(); }; }
     document.getElementById('tClear').onclick = () => { flattenAt(g, ti); g.tiles[ti] = blankTile(); render(); markDirty(); };
+    const setVal = p => { if (!p) return; t.value = p; if (!t.label) t.label = baseName(p); render(); markDirty(); };
     const br = document.getElementById('tBrowse');
-    if (br) br.onclick = async () => { const p = await configApi.pickProgram(); if (p) { t.value = p; if (!t.label) t.label = baseName(p); render(); markDirty(); } };
+    if (br) br.onclick = async () => setVal(await configApi.pickProgram());
+    const bf = document.getElementById('tBrowseFile');
+    if (bf) bf.onclick = async () => setVal(await configApi.pickFile());
+    const bd = document.getElementById('tBrowseFolder');
+    if (bd) bd.onclick = async () => setVal(await configApi.pickFolder());
     renderIconPane();
   }
 
@@ -406,7 +471,7 @@
   function renderIconPreview(t) {
     const el = document.getElementById('iconpreview'); if (!el) return;
     const type = iconTypeOf(t);
-    if (type === 'image' && t.iconImage) el.innerHTML = `<img src="${esc(fileUrl(t.iconImage))}">`;
+    if (type === 'image' && t.iconImage) el.innerHTML = `<img src="${esc(imgUrl(t.iconImage))}">`;
     else if (type === 'url' && t.iconCache) el.innerHTML = `<img src="${esc(urlSrc(t))}">`;
     else if (type === 'url') el.innerHTML = `<span class="none">fetch an image URL to preview</span>`;
     else if (type === 'app' && t.value) {
@@ -451,19 +516,10 @@
         ${g.gridOn ? `<button id="dtBtns" class="tab${onButtons ? ' on' : ''}">Buttons</button>` : ''}</div>`;
 
     if (onButtons) {   // ---- Buttons tab: strip side + size; the tile editor renders below (in render()) ----
-      const cols = g.cols || 2;
-      el.innerHTML = tabBar + `
-        <div class="row"><label style="width:auto">Side</label><select id="gAlign">
-            <option value="right" ${g.gridAlign !== 'left' ? 'selected' : ''}>Right</option>
-            <option value="left" ${g.gridAlign === 'left' ? 'selected' : ''}>Left</option></select>
-          <label style="width:auto; margin-left:16px">Size</label><select id="gSize">
-            <option value="1" ${cols === 1 ? 'selected' : ''}>2×1</option>
-            <option value="2" ${cols === 2 ? 'selected' : ''}>2×2</option>
-            <option value="3" ${cols === 3 ? 'selected' : ''}>2×3</option></select></div>
-        <p class="hint">A strip of launcher tiles on the chosen side of the dashboard — 2 rows tall, 1–3 columns wide. Edit the tiles below. Uncheck <b>Add a button grid</b> on the Dashboard tab to remove it.</p>`;
+      el.innerHTML = tabBar + gridSizeRowHtml(g) +
+        `<p class="hint">A strip of launcher tiles on the chosen side of the dashboard — 2 rows tall, 1–3 columns wide. Edit the tiles below. Uncheck <b>Add a button grid</b> on the Dashboard tab to remove it.</p>`;
       document.getElementById('dtPage').onclick = () => { dashTab = 'page'; render(); };
-      document.getElementById('gAlign').onchange = e => { g.gridAlign = e.target.value === 'left' ? 'left' : 'right'; markDirty(); };
-      document.getElementById('gSize').onchange = e => { clearAllMerges(g); g.cols = Math.max(1, Math.min(3, +e.target.value || 2)); g.rows = 2; ensureTiles(g); ti = -1; selEnd = -1; render(); markDirty(); };
+      wireGridSizeRow(g);
       return;
     }
 
@@ -500,14 +556,8 @@
     const gua = document.getElementById('gUA'); if (gua) gua.onchange = e => { g.desktopUA = e.target.checked; markDirty(); };
     document.getElementById('gGrid').onchange = e => {
       g.gridOn = e.target.checked;
-      if (g.gridOn) {   // a dashboard button grid reuses the grid schema: cols/rows/tiles (+ align)
-        if (typeof g.cols !== 'number') g.cols = 2;
-        if (typeof g.rows !== 'number') g.rows = 2;
-        if (!Array.isArray(g.tiles)) g.tiles = [];
-        if (!g.gridAlign) g.gridAlign = 'right';
-        ensureTiles(g);
-        dashTab = 'buttons';   // reveal + jump to the new tab
-      } else { dashTab = 'page'; }
+      if (g.gridOn) { enableGrid(g); dashTab = 'buttons'; }   // 2×3 default; reveal + jump to the new tab
+      else { dashTab = 'page'; }
       ti = -1; selEnd = -1; render(); markDirty();
     };
     wireRotRow(g); wireShortcutRow(g); wireAdvRow(g);
@@ -549,24 +599,49 @@
   function renderAppPage() {
     const g = curGrid();
     const def = appDefs.find(a => a.id === g.app);
-    // Apps that embed a programmable grid (def.grid) keep the tile editor populated; render() fills it.
-    if (!(def && def.grid)) ['tilegrid', 'mergebar', 'tileform', 'iconpane'].forEach(id => { document.getElementById(id).innerHTML = ''; });
+    const builtinGrid = !!(def && def.grid);          // music/agenda/events: in-page grid, always on
+    const canGrid = !!def && !builtinGrid;            // other apps (clocks, …) can opt into a native button strip
+    const onButtons = canGrid && g.gridOn && dashTab === 'buttons';
+    // Tile editor shows for a built-in grid, or on the Buttons tab of an opted-in grid; clear it otherwise.
+    if (!builtinGrid && !onButtons) ['tilegrid', 'mergebar', 'tileform', 'iconpane'].forEach(id => { document.getElementById(id).innerHTML = ''; });
     const el = document.getElementById('gridmeta');
-    el.innerHTML = `
+    const tabBar = (canGrid && g.gridOn) ? `<div class="tabbar">
+        <button id="atPage" class="tab${onButtons ? '' : ' on'}">App</button>
+        <button id="atBtns" class="tab${onButtons ? ' on' : ''}">Buttons</button></div>` : '';
+
+    if (onButtons) {   // ---- Buttons tab: side + size; the tile editor renders below (in render()) ----
+      el.innerHTML = tabBar + gridSizeRowHtml(g) +
+        `<p class="hint">A strip of launcher tiles beside the app — 2 rows tall, 1–3 columns wide. Edit the tiles below. Uncheck <b>Add a button grid</b> on the App tab to remove it.</p>`;
+      document.getElementById('atPage').onclick = () => { dashTab = 'page'; render(); };
+      wireGridSizeRow(g);
+      return;
+    }
+
+    el.innerHTML = tabBar + `
       <div class="row"><label>Name</label><input id="gName" value="${esc(g.name)}"></div>
       <div class="row"><label>App</label><select id="gApp">
         <option value="">— choose an app —</option>
         ${appDefs.filter(a => a.id === g.app || appVisible(a)).map(a => `<option value="${esc(a.id)}" ${a.id === g.app ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       </select></div>
       <div id="appOpts"></div>
+      ${canGrid ? `<div class="row" style="margin-top:10px"><label style="width:auto">Buttons</label>
+        <label class="iconopt" style="width:auto; white-space:nowrap"><input type="checkbox" id="gGrid" ${g.gridOn ? 'checked' : ''}> Add a button grid beside the app</label></div>
+      <p class="hint">Adds a strip of launcher tiles beside the app — pick the side, size, and tiles on the <b>Buttons</b> tab that appears.</p>` : ''}
       ${rotRowHtml(g)}
       ${shortcutRowHtml(g)}
       ${advRowHtml(g)}
       <div class="row" style="margin-top:10px"><button class="danger" id="gDelete">Delete page</button></div>
       <p class="hint">${def ? esc(def.name) + ' runs locally and shows full-screen on the panel.' : 'Pick an app, then set its options below.'}</p>`;
+    const atb = document.getElementById('atBtns'); if (atb) atb.onclick = () => { dashTab = 'buttons'; render(); };
     document.getElementById('gName').oninput = e => { g.name = e.target.value; renderGrids(); markDirty(); };
     document.getElementById('gApp').onchange = e => { setApp(g, e.target.value); render(); markDirty(); };
     document.getElementById('gDelete').onclick = deleteCurrentPage;
+    const gg = document.getElementById('gGrid');
+    if (gg) gg.onchange = e => {
+      g.gridOn = e.target.checked;
+      if (g.gridOn) { enableGrid(g); dashTab = 'buttons'; } else { dashTab = 'page'; }   // 2×3 default
+      ti = -1; selEnd = -1; render(); markDirty();
+    };
     wireRotRow(g); wireShortcutRow(g); wireAdvRow(g);
     renderAppOpts(g, def);
   }
@@ -620,7 +695,7 @@
     if (view === 'settings') { renderSettings(); return; }
     const g = curGrid();
     if (g && g.kind === 'web') { renderDashboard(); if (g.gridOn && dashTab === 'buttons') { renderTiles(); renderForm(); } }   // dashboard Buttons tab -> show the tile editor
-    else if (g && g.kind === 'app') { renderAppPage(); const def = appDefs.find(a => a.id === g.app); if (def && def.grid) { renderTiles(); renderForm(); } }   // app with an embedded grid -> show the tile editor too
+    else if (g && g.kind === 'app') { renderAppPage(); const def = appDefs.find(a => a.id === g.app); if ((def && def.grid) || (g.gridOn && dashTab === 'buttons')) { renderTiles(); renderForm(); } }   // built-in grid, or an opted-in button grid on the Buttons tab
     else { renderMeta(); renderTiles(); renderForm(); }
   }
 
