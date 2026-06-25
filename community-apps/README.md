@@ -8,6 +8,5 @@ For how to install or submit an app — and a safety note — see the docs:
 
 ## Available apps
 
-| App | Download | Source |
-| --- | --- | --- |
-| **News Spotlight** — scrolling headline ticker from an RSS/news feed | [news-spotlight.zip](news-spotlight.zip) | [news-spotlight/](news-spotlight/) |
+_No apps published yet._ To add one, open a pull request — see
+[docs/community-apps.md](../docs/community-apps.md#submitting-one).
