@@ -1,13 +1,18 @@
   function $(id){ return document.getElementById(id); }
-  // theme — host passes _dark=1/0 and _accent=#hex via the served query string
+  // theme + options — host passes _dark=1/0, _accent=#hex, and app options (art=0/1) via the served query.
   (function(){
     try {
       var q = new URLSearchParams(location.search);
       document.body.classList.toggle('light', q.get('_dark') === '0');
       var a = q.get('_accent') || '';
       if (/^#[0-9a-fA-F]{6}$/.test(a)) document.documentElement.style.setProperty('--accent', a);
+      document.body.classList.toggle('no-art', q.get('art') === '0');   // Show album art toggle
+      document.body.classList.toggle('show-lyrics', q.get('lyrics') === '1');   // Show lyrics toggle
     } catch (e) {}
   })();
+  // Tight layout when the webview is narrow (e.g. a 2×3 button strip is on) — pull padding/sizes in.
+  function applyTight(){ document.body.classList.toggle('tight', window.innerWidth < 1350); }
+  applyTight(); window.addEventListener('resize', applyTight);
   function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
   var ICON = {
     prev: '<svg viewBox="0 0 24 24"><path d="M7 6h2.4v12H7z"/><path d="M20 6v12l-9-6z"/></svg>',
@@ -43,34 +48,48 @@
     setArt(s.art);
   }
 
-  function renderGrid(d){
-    var host = $('grid'), cols = d.cols || 2, rows = d.rows || 2, n = cols * rows, tiles = d.tiles || [];
-    host.style.gridTemplateColumns = 'repeat(' + cols + ',1fr)';
-    host.style.gridTemplateRows = 'repeat(' + rows + ',1fr)';
-    var html = '';
-    for (var i = 0; i < n; i++){
-      var t = tiles[i];
-      if (t && t.type && t.cover == null){
-        var ic = t.iconSrc ? '<div class="ic"><img src="' + esc(t.iconSrc) + '"></div>' : '<div class="ic">' + esc(t.icon || '▫️') + '</div>';
-        html += '<div class="tile" data-i="' + i + '">' + ic + '<div class="lb">' + esc(t.label || '') + '</div></div>';
-      } else {
-        html += '<div class="tile empty"></div>';
-      }
-    }
-    host.innerHTML = html;
-    host.querySelectorAll('.tile[data-i]').forEach(function(el){
-      el.onclick = function(){ fetch('/launch?i=' + el.getAttribute('data-i'), { cache: 'no-store' }).catch(function(){}); };
-    });
-  }
-
+  var np = { pos: 0, ts: 0, status: '' };   // last known playback position + when it was captured (same clock as us)
   function pollNP(){
     fetch('/nowplaying', { cache: 'no-store' }).then(function(r){ return r.json(); })
-      .then(function(s){ $('recon').classList.remove('show'); renderNP(s); })
+      .then(function(s){
+        $('recon').classList.remove('show');
+        if (s) { np.pos = s.position || 0; np.ts = s.ts || Date.now(); np.status = s.status || ''; }
+        renderNP(s);
+      })
       .catch(function(){ $('recon').classList.add('show'); });
   }
-  function pollGrid(){
-    fetch('/grid-tiles', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(renderGrid).catch(function(){});
-  }
-  pollNP(); pollGrid();
+  pollNP();
   setInterval(pollNP, 1500);
-  setInterval(pollGrid, 3000);   // pick up edits made in the editor
+  // The launcher grid is now the native button strip (rendered by the panel, not this page).
+
+  // ---- lyrics (LRCLIB via /lyrics) — synced lines auto-scroll; plain lyrics scroll manually ----
+  if (document.body.classList.contains('show-lyrics')) {
+    var lyr = { key: '', synced: false, lines: [], active: -1 };
+    var manualUntil = 0;   // knob "scroll in window" -> wheel scrolls the lyrics; pause auto-scroll for a bit after
+    document.addEventListener('wheel', function (e) { var h = $('lyrics'); if (h) { h.scrollTop += e.deltaY; manualUntil = Date.now() + 4000; } }, { passive: true });
+    function renderLyrics(d){
+      var host = $('lyrics');
+      if (!d || !d.ok) { if (lyr.key !== '__none') { host.innerHTML = '<div class="none">—</div>'; lyr.key = '__none'; lyr.lines = []; lyr.synced = false; } return; }
+      if (d.key === lyr.key) return;   // same track, already rendered
+      lyr.key = d.key; lyr.synced = !!d.synced; lyr.lines = d.lines || []; lyr.active = -1; host.scrollTop = 0;
+      if (lyr.synced && lyr.lines.length) host.innerHTML = lyr.lines.map(function(l, i){ return '<div class="ln" data-i="' + i + '">' + esc(l.line || '♪') + '</div>'; }).join('');
+      else if (d.plain) host.innerHTML = '<div class="plain">' + esc(d.plain) + '</div>';
+      else host.innerHTML = '<div class="none">No lyrics found</div>';
+    }
+    function lyricTick(){
+      if (!lyr.synced || !lyr.lines.length) return;
+      var est = np.pos + (np.status === 'Playing' ? (Date.now() - np.ts) / 1000 : 0);
+      var idx = -1;
+      for (var i = 0; i < lyr.lines.length; i++){ if (lyr.lines[i].t <= est + 0.15) idx = i; else break; }
+      if (idx === lyr.active) return;
+      lyr.active = idx;
+      var host = $('lyrics');
+      var prev = host.querySelector('.ln.on'); if (prev) prev.classList.remove('on');
+      var el = idx >= 0 ? host.querySelector('.ln[data-i="' + idx + '"]') : null;
+      if (el){ el.classList.add('on'); if (Date.now() > manualUntil) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }   // hold position right after a manual scroll
+    }
+    function pollLyrics(){ fetch('/lyrics', { cache: 'no-store' }).then(function(r){ return r.json(); }).then(renderLyrics).catch(function(){}); }
+    pollLyrics();
+    setInterval(pollLyrics, 4000);   // picks up track changes
+    setInterval(lyricTick, 250);
+  }

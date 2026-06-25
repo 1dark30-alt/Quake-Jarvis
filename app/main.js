@@ -119,9 +119,15 @@ function ensureSystemViewPage(port) {
   config.sysviewInjected = true;
   saveConfig();
 }
-// The Music controller is a built-in APP page (kind:'app', app:'music') that embeds a programmable
-// 2x2 tile grid — edited in the editor exactly like Default/Media/Dev, its tiles launched via runAction.
-// Ensure one exists on first run; respect deletion thereafter (musicInjected gate).
+// The Music controller is a built-in APP page (kind:'app', app:'music'). Its launcher grid is now the
+// optional native button strip (like the clock apps): gridOn + gridAlign 'right' (the strip is always on
+// the far right, with album art on the far left). Ensure one exists on first run; respect deletion (musicInjected).
+const MUSIC_DEFAULT_TILES = [
+  { label: 'Spotify', icon: '🎵', type: 'url', value: 'https://open.spotify.com' },
+  { label: 'YT Music', icon: '📺', type: 'url', value: 'https://music.youtube.com' },
+  { label: 'Apple Music', icon: '🍎', type: 'url', value: 'https://music.apple.com' },
+  { label: 'Tidal', icon: '🌊', type: 'url', value: 'https://listen.tidal.com' },
+];
 function ensureMusicPage() {
   if (!config.grids) config.grids = [];
   let g = config.grids.find(x => x.id === 'music');
@@ -134,10 +140,9 @@ function ensureMusicPage() {
   delete g.url; delete g.auth;
   if (typeof g.cols !== 'number') g.cols = 2;
   if (typeof g.rows !== 'number') g.rows = 2;
-  if (!Array.isArray(g.tiles) || !g.tiles.length) {
-    const def = loadApps().find(a => a.id === 'music');
-    g.tiles = ((def && def.grid && def.grid.defaults) || []).map(t => Object.assign({}, t));
-  }
+  if (!Array.isArray(g.tiles) || !g.tiles.length) g.tiles = MUSIC_DEFAULT_TILES.map(t => Object.assign({}, t));
+  if (typeof g.gridOn !== 'boolean') g.gridOn = true;      // migrate the old always-on built-in grid to the toggleable strip
+  g.gridAlign = 'right';                                   // music grid is always far right (album art is far left)
   saveConfig();
 }
 // An app's embedded grid (Music, Agenda, Events, …) is served to the page (resolved icons) and its taps
@@ -397,13 +402,28 @@ async function resolveTiles(tiles) {
     return out;
   }));
 }
+// Knob behavior is configurable per page TYPE (grid / dashboard / app), with an optional per-page override.
+// turn: 'pages' | 'volume' | 'scroll' | 'select'   ·   click: 'rotation' | 'mute' | 'enter'
+const KNOB_DEFAULT = { turn: 'pages', click: 'rotation' };
+function pageTypeOf(g) { return g.kind === 'app' ? 'app' : g.kind === 'web' ? 'dashboard' : 'grid'; }
+function effectiveKnob(g) {
+  const all = (config.settings && config.settings.knob) || {};
+  const base = Object.assign({}, KNOB_DEFAULT, all[pageTypeOf(g)] || {});
+  if (g.knobOverride && g.knob) return { turn: g.knob.turn || base.turn, click: g.knob.click || base.click };
+  return base;
+}
 async function resolveGridIcons(grid) {
-  if (grid.kind === 'app') {                                                                         // render the local app in the webview; themed:true -> panel injects live light/dark + accent
+  const knob = effectiveKnob(grid);   // resolved from the ORIGINAL kind (apps get converted to 'web' below)
+  let out;
+  if (grid.kind === 'app') {                                                                          // render the local app in the webview; themed:true -> panel injects live light/dark + accent
     const base = { ...grid, kind: 'web', url: appPageUrl(grid), themed: true };
-    return grid.gridOn ? { ...base, tiles: await resolveTiles(grid.tiles) } : base;                  // file/app pages with the native button strip -> resolve its tile icons
+    out = grid.gridOn ? { ...base, tiles: await resolveTiles(grid.tiles) } : base;                    // file/app pages with the native button strip -> resolve its tile icons
+  } else if (grid.kind === 'web') {
+    out = grid.gridOn ? { ...grid, tiles: await resolveTiles(grid.tiles) } : grid;                    // dashboard: resolve the button-grid tile icons, else nothing to resolve
+  } else {
+    out = { ...grid, tiles: await resolveTiles(grid.tiles) };
   }
-  if (grid.kind === 'web') return grid.gridOn ? { ...grid, tiles: await resolveTiles(grid.tiles) } : grid;   // dashboard: resolve the button-grid tile icons, else nothing to resolve
-  return { ...grid, tiles: await resolveTiles(grid.tiles) };
+  return Object.assign({}, out, { _knob: knob });
 }
 
 // Extract a program's own icon as a data: URL (best-effort; null if it can't be resolved).
@@ -606,9 +626,9 @@ function monitorKnob(k) {
 
 function openConfigWindow() {
   if (configWin && !configWin.isDestroyed()) { configWin.show(); configWin.focus(); return; }
-  const prim = screen.getPrimaryDisplay().bounds;
+  const wa = screen.getPrimaryDisplay().workArea;   // full usable screen height (minus taskbar)
   configWin = new BrowserWindow({
-    width: 1180, height: 760, x: prim.x + 80, y: prim.y + 60, title: 'open-quake Editor',
+    width: 1180, height: wa.height, x: wa.x + 80, y: wa.y, title: 'open-quake Editor',
     backgroundColor: '#11151c',
     webPreferences: {
       nodeIntegration: false,
@@ -818,6 +838,7 @@ app.whenReady().then(async () => {
 
   ipcMain.on('launch', (e, a) => { if (!isFrom(e, panelWin)) return; runAction(a); });
   ipcMain.on('volume', (e, v) => { if (!isFrom(e, panelWin)) return; mediaKeys.volume(v); });
+  ipcMain.on('media', (e, cmd) => { if (!isFrom(e, panelWin)) return; mediaKey(cmd); });   // knob 'enter' on the music page -> play/pause
   ipcMain.on('switchGrid', (e, id) => { if (!isFrom(e, panelWin)) return; gotoGrid(id, true); if (rotateRunning) scheduleRotation(); });   // a manual pick resets the rotation timer
   ipcMain.on('toggleRotation', (e) => { if (!isFrom(e, panelWin)) return; toggleRotation(); });
   ipcMain.on('openConfig', (e) => { if (!isFrom(e, panelWin) && !isFrom(e, configWin)) return; openConfigWindow(); });

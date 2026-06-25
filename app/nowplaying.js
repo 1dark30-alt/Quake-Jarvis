@@ -27,7 +27,7 @@ const SMTC_PS = [
   // (e.g. Music Assistant) while another (Audiobookshelf) is the one playing. Fall back to current.
   "$c=$null;foreach($s in $mgr.GetSessions()){try{if($s.GetPlaybackInfo().PlaybackStatus.ToString() -eq 'Playing'){$c=$s;break}}catch{}}",
   "if(-not $c){$c=$mgr.GetCurrentSession()}",
-  "if($c){$p=Await ($c.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties]);$i=$c.GetPlaybackInfo();[pscustomobject]@{title=$p.Title;artist=$p.Artist;album=$p.AlbumTitle;status=$i.PlaybackStatus.ToString();app=$c.SourceAppUserModelId}|ConvertTo-Json -Compress}"
+  "if($c){$p=Await ($c.TryGetMediaPropertiesAsync()) ([Windows.Media.Control.GlobalSystemMediaTransportControlsSessionMediaProperties]);$i=$c.GetPlaybackInfo();$pos=0.0;$dur=0.0;try{$tl=$c.GetTimelineProperties();$pos=$tl.Position.TotalSeconds;$dur=$tl.EndTime.TotalSeconds}catch{};[pscustomobject]@{title=$p.Title;artist=$p.Artist;album=$p.AlbumTitle;status=$i.PlaybackStatus.ToString();app=$c.SourceAppUserModelId;position=$pos;duration=$dur}|ConvertTo-Json -Compress}"
 ].join('');
 const SMTC_B64 = Buffer.from(SMTC_PS, 'utf16le').toString('base64');
 
@@ -106,7 +106,7 @@ function poll() {
         if (err || !stdout || !stdout.trim()) return resolve(null);   // no session / error
         try {
           const o = JSON.parse(stdout.trim());
-          resolve({ title: o.title || null, artist: o.artist || null, album: o.album || null, status: o.status || null, app: o.app || null });
+          resolve({ title: o.title || null, artist: o.artist || null, album: o.album || null, status: o.status || null, app: o.app || null, position: +o.position || 0, duration: +o.duration || 0 });
         } catch (e) { resolve(null); }
       });
   });
@@ -133,7 +133,8 @@ function stop() { running = false; if (timer) clearInterval(timer); timer = null
 function getSnapshot() {                                                    // null => "nothing playing"
   if (!(snapTs && Date.now() - snapTs < STALE_MS)) return null;
   const k = trackKey(snapshot);
-  return Object.assign({}, snapshot, { art: (k in artCache) ? artCache[k] : null });
+  // ts = when this position was captured (same machine clock as the page) so the page can interpolate scroll.
+  return Object.assign({}, snapshot, { art: (k in artCache) ? artCache[k] : null, ts: snapTs });
 }
 
 module.exports = { start, stop, getSnapshot, setProvider };

@@ -20,6 +20,7 @@ const path = require('path');
 const metrics = require('./sysmetrics');
 const nowplaying = require('./nowplaying');
 const haschedule = require('./haschedule');   // HA Schedule dev app (main.js drives its poll start/stop)
+const lyrics = require('./lyrics');           // Music lyrics (LRCLIB), fetched on demand for the now-playing track
 
 const FALLBACK = '<!doctype html><meta charset="utf-8">'
   + '<body style="margin:0;background:#05080d;color:#9fb3c8;font:20px Segoe UI, sans-serif">page asset missing.</body>';
@@ -109,6 +110,7 @@ async function handler(req, res) {
   }
   if (url === '/metrics') return json(res, metrics.getSnapshot());
   if (url === '/nowplaying') return json(res, nowplaying.getSnapshot());
+  if (url === '/lyrics') { try { await lyrics.ensure(nowplaying.getSnapshot()); } catch (e) {} return json(res, lyrics.getSnapshot()); }   // synced lyrics for the current track
   if (url === '/haschedule-data') return json(res, haschedule.getSnapshot());
   if (url === '/grid-tiles') {
     let t = { cols: 2, rows: 2, tiles: [] };

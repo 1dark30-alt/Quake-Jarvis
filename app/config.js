@@ -26,6 +26,11 @@
   const TYPES = [['', 'Empty'], ['app', 'App / Program'], ['url', 'Website (URL)'], ['page', 'Go to open-quake page'], ['cmd', 'Shell command'], ['open', 'Open file/folder'], ['system', 'System (lock/config)'], ['counter', 'Counter'], ['paste_text', 'Paste Text'], ['key', 'Send keystroke'], ['macro', 'Macro / Steps']];
   // Step kinds inside a Macro tile (value semantics mirror the matching tile types).
   const STEP_KINDS = [['key', 'Keystroke'], ['text', 'Type text'], ['delay', 'Delay (ms)'], ['app', 'App / Program'], ['open', 'Open file/folder'], ['url', 'Website (URL)'], ['cmd', 'Shell command'], ['page', 'Go to page'], ['system', 'System'], ['ahk', 'AutoHotkey']];
+  // Knob behavior options (per page-type, with per-page override). Defaults: turn=Scroll pages, click=Start/stop rotation.
+  const KNOB_TURN_OPTS = [['pages', 'Scroll pages'], ['volume', 'System volume'], ['scroll', 'Scroll in window'], ['select', 'Select button']];
+  const KNOB_CLICK_OPTS = [['rotation', 'Start/stop rotation'], ['mute', 'System audio toggle'], ['enter', 'Enter']];
+  const knobSelHtml = (id, opts, val) => `<select id="${id}">${opts.map(o => `<option value="${o[0]}" ${o[0] === val ? 'selected' : ''}>${o[1]}</option>`).join('')}</select>`;
+  function knobOf(type, field) { const k = ((config.settings || {}).knob || {})[type] || {}; return k[field] || (field === 'turn' ? 'pages' : 'rotation'); }
   const uid = () => 'g' + Math.random().toString(36).slice(2, 8);
   const curGrid = () => config.grids[gi];
   const esc = s => (s || '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -107,6 +112,9 @@
         <label class="iconopt" style="width:auto"><input type="checkbox" id="gAccOn" ${hasAcc ? 'checked' : ''}> Override</label>
         <input type="color" id="gAcc" value="${hasAcc ? esc(g.accent) : '#7CFFB2'}" style="width:48px;height:28px;padding:2px;margin-left:8px" ${hasAcc ? '' : 'disabled'}></div>
       <p class="hint">When checked, this page overrides the global theme. (Web dashboards follow the global light/dark only.)</p>
+      <div class="row" style="margin-top:8px"><label style="width:auto">Knob</label>
+        <label class="iconopt" style="width:auto"><input type="checkbox" id="gKnobOn" ${g.knobOverride ? 'checked' : ''}> Override</label></div>
+      ${g.knobOverride ? `<div class="row"><label style="width:auto">Turn / Click</label>${knobSelHtml('gKnobTurn', KNOB_TURN_OPTS, (g.knob && g.knob.turn) || 'pages')} ${knobSelHtml('gKnobClick', KNOB_CLICK_OPTS, (g.knob && g.knob.click) || 'rotation')}</div>` : ''}
       ${advCloneHtml(g)}
     </details>`;
   }
@@ -134,6 +142,10 @@
       accOn.onchange = e => { if (e.target.checked) g.accent = acc.value; else delete g.accent; acc.disabled = !e.target.checked; markDirty(); };
       acc.oninput = e => { if (accOn.checked) { g.accent = e.target.value; markDirty(); } };
     }
+    const kOn = document.getElementById('gKnobOn');
+    if (kOn) kOn.onchange = e => { g.knobOverride = e.target.checked; if (g.knobOverride && !g.knob) g.knob = { turn: 'pages', click: 'rotation' }; markDirty(); render(); };
+    const kT = document.getElementById('gKnobTurn'); if (kT) kT.onchange = e => { if (!g.knob) g.knob = {}; g.knob.turn = e.target.value; markDirty(); };
+    const kC = document.getElementById('gKnobClick'); if (kC) kC.onchange = e => { if (!g.knob) g.knob = {}; g.knob.click = e.target.value; markDirty(); };
     const clone = document.getElementById('gClone'), cloneBtn = document.getElementById('gCloneBtn');
     if (clone && cloneBtn) {
       clone.onchange = () => { cloneBtn.disabled = !clone.value; };
@@ -171,12 +183,13 @@
     if (!g.gridAlign) g.gridAlign = 'right';
     ensureTiles(g);
   }
-  function gridSizeRowHtml(g) {
+  function gridSizeRowHtml(g, hideSide) {
     const cols = g.cols || 3;
-    return `<div class="row"><label style="width:auto">Side</label><select id="gAlign">
+    const side = hideSide ? '' : `<label style="width:auto">Side</label><select id="gAlign">
         <option value="right" ${g.gridAlign !== 'left' ? 'selected' : ''}>Right</option>
         <option value="left" ${g.gridAlign === 'left' ? 'selected' : ''}>Left</option></select>
-      <label style="width:auto; margin-left:16px">Size</label><select id="gSize">
+      <label style="width:auto; margin-left:16px">`;
+    return `<div class="row">${side}${hideSide ? '<label style="width:auto">' : ''}Size</label><select id="gSize">
         <option value="1" ${cols === 1 ? 'selected' : ''}>2×1</option>
         <option value="2" ${cols === 2 ? 'selected' : ''}>2×2</option>
         <option value="3" ${cols === 3 ? 'selected' : ''}>2×3</option></select></div>`;
@@ -684,23 +697,32 @@
         <button id="atBtns" class="tab${onButtons ? ' on' : ''}">Buttons</button></div>` : '';
 
     if (onButtons) {   // ---- Buttons tab: side + size; the tile editor renders below (in render()) ----
-      el.innerHTML = tabBar + gridSizeRowHtml(g) +
+      el.innerHTML = tabBar + gridSizeRowHtml(g, g.app === 'music') +   // Music's grid is pinned right — hide the Side picker
         `<p class="hint">A strip of launcher tiles beside the app — 2 rows tall, 1–3 columns wide. Edit the tiles below. Uncheck <b>Add a button grid</b> on the App tab to remove it.</p>`;
       document.getElementById('atPage').onclick = () => { dashTab = 'page'; render(); };
       wireGridSizeRow(g);
       return;
     }
 
+    // Music groups its three panels (album art / lyrics / button grid) in one box, capped at 2 on.
+    const isMusic = g.app === 'music';
+    const musicBox = `<fieldset style="border:1px solid #2a3a4e; border-radius:8px; padding:6px 14px 10px; margin:10px 0">
+        <legend style="padding:0 6px; color:#9fb3c8; font-size:13px">Panels</legend>
+        <div><label class="iconopt" style="width:auto"><input type="checkbox" id="pArt" ${optVal(g, 'art', true) ? 'checked' : ''}> Show album art</label></div>
+        <div><label class="iconopt" style="width:auto"><input type="checkbox" id="pLyrics" ${optVal(g, 'lyrics', false) ? 'checked' : ''}> Show lyrics</label></div>
+        <div><label class="iconopt" style="width:auto"><input type="checkbox" id="gGrid" ${g.gridOn ? 'checked' : ''}> Buttons (grid)</label></div>
+        <p class="hint" style="margin:6px 0 0">Only two may be checked at once (screen space). Grid size/tiles are on the <b>Buttons</b> tab.</p>
+      </fieldset>`;
+    const optsBlock = isMusic ? musicBox : ('<div id="appOpts"></div>' + (canGrid ? `<div class="row" style="margin-top:10px"><label style="width:auto">Buttons</label>
+        <label class="iconopt" style="width:auto; white-space:nowrap"><input type="checkbox" id="gGrid" ${g.gridOn ? 'checked' : ''}> Add a button grid beside the app</label></div>
+      <p class="hint">Adds a strip of launcher tiles beside the app — pick the side, size, and tiles on the <b>Buttons</b> tab that appears.</p>` : ''));
     el.innerHTML = tabBar + `
       <div class="row"><label>Name</label><input id="gName" value="${esc(g.name)}"></div>
       <div class="row"><label>App</label><select id="gApp">
         <option value="">— choose an app —</option>
         ${appDefs.filter(a => a.id === g.app || appVisible(a)).map(a => `<option value="${esc(a.id)}" ${a.id === g.app ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
       </select></div>
-      <div id="appOpts"></div>
-      ${canGrid ? `<div class="row" style="margin-top:10px"><label style="width:auto">Buttons</label>
-        <label class="iconopt" style="width:auto; white-space:nowrap"><input type="checkbox" id="gGrid" ${g.gridOn ? 'checked' : ''}> Add a button grid beside the app</label></div>
-      <p class="hint">Adds a strip of launcher tiles beside the app — pick the side, size, and tiles on the <b>Buttons</b> tab that appears.</p>` : ''}
+      ${optsBlock}
       ${rotRowHtml(g)}
       ${shortcutRowHtml(g)}
       ${advRowHtml(g)}
@@ -716,8 +738,24 @@
       if (g.gridOn) { enableGrid(g); dashTab = 'buttons'; } else { dashTab = 'page'; }   // 2×3 default
       ti = -1; selEnd = -1; render(); markDirty();
     };
+    if (isMusic) {
+      const pa = document.getElementById('pArt'); if (pa) pa.onchange = e => { if (!g.options) g.options = {}; g.options.art = e.target.checked; markDirty(); enforceMusicCap(g); };
+      const pl = document.getElementById('pLyrics'); if (pl) pl.onchange = e => { if (!g.options) g.options = {}; g.options.lyrics = e.target.checked; markDirty(); enforceMusicCap(g); };
+    } else {
+      renderAppOpts(g, def);
+    }
     wireRotRow(g); wireShortcutRow(g); wireAdvRow(g);
-    renderAppOpts(g, def);
+    enforceMusicCap(g);
+  }
+  // Music: only 2 of {button grid, album art, lyrics} fit at once. Disable the unchecked third.
+  function optVal(g, key, dflt) { const o = g.options || {}; return (key in o) ? o[key] : dflt; }
+  function musicPanels(g) { return { grid: !!g.gridOn, art: !!optVal(g, 'art', true), lyrics: !!optVal(g, 'lyrics', false) }; }
+  function enforceMusicCap(g) {
+    if (!g || g.app !== 'music') return;
+    const p = musicPanels(g); const full = (p.grid ? 1 : 0) + (p.art ? 1 : 0) + (p.lyrics ? 1 : 0) >= 2;
+    const gg = document.getElementById('gGrid'); if (gg) gg.disabled = full && !p.grid;
+    const pa = document.getElementById('pArt'); if (pa) pa.disabled = full && !p.art;
+    const pl = document.getElementById('pLyrics'); if (pl) pl.disabled = full && !p.lyrics;
   }
   function setApp(g, id) {
     const prev = appDefs.find(a => a.id === g.app);
@@ -754,7 +792,9 @@
       g.options[e.target.dataset.key] = (o && o.type === 'bool') ? e.target.checked : e.target.value;
       markDirty();
       if (o && (o.type === 'select' || o.type === 'bool')) renderAppOpts(g, def);   // re-evaluate conditional (showIf) options
+      enforceMusicCap(g);   // re-apply the 2-of-3 panel cap (grid/art/lyrics)
     });
+    enforceMusicCap(g);
   }
 
   function deleteCurrentPage() {
@@ -829,6 +869,11 @@
       <div class="row"><label>Effect speed</label>
         <input type="range" id="sSpeed" min="0" max="255" value="${L.speed}" style="width:200px">
         <span id="sSpeedVal" class="hint" style="margin:0 0 0 10px">${L.speed}</span></div>
+      <div class="row" style="margin-top:6px"><label>Knob — turn / click</label></div>
+      <div class="row"><label style="width:auto">Grid</label>${knobSelHtml('knGridTurn', KNOB_TURN_OPTS, knobOf('grid', 'turn'))} ${knobSelHtml('knGridClick', KNOB_CLICK_OPTS, knobOf('grid', 'click'))}</div>
+      <div class="row"><label style="width:auto">Dashboard</label>${knobSelHtml('knDashTurn', KNOB_TURN_OPTS, knobOf('dashboard', 'turn'))} ${knobSelHtml('knDashClick', KNOB_CLICK_OPTS, knobOf('dashboard', 'click'))}</div>
+      <div class="row"><label style="width:auto">App</label>${knobSelHtml('knAppTurn', KNOB_TURN_OPTS, knobOf('app', 'turn'))} ${knobSelHtml('knAppClick', KNOB_CLICK_OPTS, knobOf('app', 'click'))}</div>
+      <p class="hint">What turning / clicking the knob does on each kind of page. Any page can override this in its <b>Advanced</b> settings. (“Select button” highlights tiles as you turn; “Enter” activates the highlighted button, play/pauses music, or sends an Enter key.)</p>
       <p class="hint">Changes apply to the ring instantly. <b>Save to device</b> writes them to the device's own memory so they survive a power-cycle. (Effect “All Off” turns the ring off. Animated effects use the color/speed; solid effects ignore speed.)</p>
       <div class="row" style="margin-top:6px"><button id="sSaveLed">Save to device</button><span id="sSaveLedMsg" class="hint" style="margin:0 0 0 10px"></span></div>
 
@@ -964,6 +1009,17 @@
         const ok = await configApi.saveLightingToDevice();
         msg.textContent = ok ? 'saved to device ✓' : 'save failed';
       };
+      // Knob behavior per page-type
+      const setKnob = (type, field, val) => {
+        if (!config.settings) config.settings = {};
+        if (!config.settings.knob) config.settings.knob = {};
+        if (!config.settings.knob[type]) config.settings.knob[type] = { turn: 'pages', click: 'rotation' };
+        config.settings.knob[type][field] = val; markDirty();
+      };
+      [['grid', 'knGrid'], ['dashboard', 'knDash'], ['app', 'knApp']].forEach(([type, id]) => {
+        document.getElementById(id + 'Turn').onchange = e => setKnob(type, 'turn', e.target.value);
+        document.getElementById(id + 'Click').onchange = e => setKnob(type, 'click', e.target.value);
+      });
     } else if (tab === 'monitor') {
       // Monitor mode — knob turn/tap behavior (applied by the main process while in monitor mode)
       const saveMon = patch => { if (!config.settings) config.settings = {}; config.settings.monitor = Object.assign(currentMon(), patch); markDirty(); };

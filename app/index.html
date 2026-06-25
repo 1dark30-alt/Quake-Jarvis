@@ -45,6 +45,8 @@
   .tile.hit { background: linear-gradient(160deg, color-mix(in srgb, var(--accent) 26%, var(--tile1)), var(--tile2));
     border-color: var(--accent); transform: scale(.95);
     box-shadow: 0 0 26px color-mix(in srgb, var(--accent) 50%, transparent); }
+  /* knob "select button" mode: persistent thick accent border on the highlighted tile */
+  .tile.ksel { outline: 5px solid var(--accent); outline-offset: -5px; box-shadow: 0 0 22px color-mix(in srgb, var(--accent) 45%, transparent); }
   #vol { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%); font-size: 44px;
     color: var(--accent); background: var(--overlay); padding: 18px 30px; border-radius: 16px;
     opacity: 0; transition: opacity .12s; pointer-events: none; }

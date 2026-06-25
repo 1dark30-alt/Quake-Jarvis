@@ -7,6 +7,8 @@
   let grids = [], activeId = null, rotEnabled = false, rotRunning = false, introOpen = false;
   let armed = false, idleT = null, lastHit = -1, volT = null;
   let selOpen = false, selIdx = 0, selAutoClose = null;
+  let knobSel = -1;   // knob "select button" mode: index of the highlighted tile (-1 = none)
+  let pendingRotFlash = false;   // a knob click just toggled rotation -> flash the new state when it comes back
   let webMode = false, curUrl = '', webReady = false, webDown = false, lastWeb = { x: 0, y: 0 }, webIdle = null;
   let haToken = '', haInject = false, webExternalLinks = false, webAttached = false, pendingWebUrl = null;
   let webThemed = false, lastTheme = null;   // our served app pages (Music/Chat): inject live light/dark + accent into the guest
@@ -148,6 +150,7 @@
   }
   panelApi.onGrid(g => {
     cfg = g;
+    knobSel = -1;   // drop any knob "select" highlight when the page changes
     if (g && g.kind === 'web') {            // dashboard page -> show the webview
       webMode = true; grid.style.display = 'none'; web.classList.add('show');
       webThemed = !!g.themed;               // our served app page -> inject light/dark + accent on load
@@ -183,7 +186,10 @@
     lastTheme = t; injectWebTheme();                                    // push the theme live into a served app page (no reload needed)
   });
   panelApi.onGridList(d => { grids = d.grids; activeId = d.activeId; if (selOpen) renderWheel(); });
-  panelApi.onRotation(r => { rotEnabled = !!r.enabled; rotRunning = !!r.running; if (selOpen) renderWheel(); });
+  panelApi.onRotation(r => {
+    rotEnabled = !!r.enabled; rotRunning = !!r.running; if (selOpen) renderWheel();
+    if (pendingRotFlash) { pendingRotFlash = false; flashVol(rotRunning ? '⟳ Rotation on' : '⛔ Rotation off'); }
+  });
 
   // ---- first-run intro overlay (one-time "double-click the knob" hint) ----
   panelApi.onIntro(() => { if (introOpen) return; introOpen = true; intro.classList.add('open'); });
@@ -367,21 +373,54 @@
       return;
     }
     if (k.type === 'rotate') {
-      if (selOpen) { moveSelector(k.dir > 0 ? -1 : 1); }                  // CW scrolls down the list
-      else if (webMode && webReady) {
-        // Native wheel event at center: Chromium routes it to whatever element is scrollable
-        // under that point, so inner scroll containers (Grafana/HA panels) scroll too.
-        try { web.sendInputEvent({ type: 'mouseWheel', x: Math.round(webRegion.width / 2), y: 240, deltaX: 0, deltaY: k.dir > 0 ? -120 : 120, wheelTicksX: 0, wheelTicksY: k.dir > 0 ? -1 : 1, hasPreciseScrollingDeltas: true, canScroll: true }); } catch (e) {}
+      if (selOpen) { moveSelector(k.dir > 0 ? -1 : 1); return; }          // CW scrolls down the page list
+      const turn = (cfg._knob && cfg._knob.turn) || 'pages';
+      if (turn === 'volume') { panelApi.volume(k.dir > 0 ? 1 : -1); flashVol(k.dir > 0 ? '🔊 +' : '🔉 −'); }
+      else if (turn === 'scroll') {                                       // native wheel at center -> inner scrollables (Grafana/HA, lyrics) scroll too
+        if (webMode && webReady) { try { web.sendInputEvent({ type: 'mouseWheel', x: Math.round(webRegion.width / 2), y: 240, deltaX: 0, deltaY: k.dir > 0 ? -120 : 120, wheelTicksX: 0, wheelTicksY: k.dir > 0 ? -1 : 1, hasPreciseScrollingDeltas: true, canScroll: true }); } catch (e) {} }
       }
-      else { panelApi.volume(k.dir > 0 ? 1 : -1); flashVol(k.dir > 0 ? '🔊 +' : '🔉 −'); }
+      else if (turn === 'select') { selectMove(k.dir > 0 ? 1 : -1); }
+      else { cyclePage(k.dir > 0 ? -1 : 1); }                            // 'pages' (default): match the double-click selector's turn direction
       return;
     }
     if (k.type === 'press') {
       if (selOpen) { confirmSelector(); return; }           // any press picks the highlighted grid
-      if (k.index === 2) { openSelector(); }                // double-click -> grid selector
-      else { panelApi.volume('mute'); flashVol('🔇'); }  // single-click -> mute
+      if (k.index === 2) { openSelector(); return; }        // double-click -> page selector (always available)
+      const click = (cfg._knob && cfg._knob.click) || 'rotation';
+      if (click === 'mute') { panelApi.volume('mute'); flashVol('🔇'); }
+      else if (click === 'enter') { knobEnter(); }
+      else { pendingRotFlash = true; panelApi.toggleRotation(); }   // 'rotation' (default) — flash the new state on the rotation update
     }
   });
+  // ---- knob "scroll pages" / "select button" / "enter" ----
+  function cyclePage(dir) {
+    if (!grids.length) return;
+    let gi = grids.findIndex(g => g.id === activeId); if (gi < 0) gi = 0;
+    panelApi.switchGrid(grids[(gi + dir + grids.length) % grids.length].id);
+  }
+  function selHost() { return (webMode && webStrip) ? webgrid : (!webMode ? grid : null); }   // grid tiles, or a dashboard/app's strip; null on a page with no buttons
+  function selButtons() { const out = []; (cfg.tiles || []).forEach((t, i) => { if (t && t.type && t.cover == null) out.push(i); }); return out; }
+  function renderSel() {
+    document.querySelectorAll('[data-i].ksel').forEach(el => el.classList.remove('ksel'));
+    const host = selHost(); if (!host || knobSel < 0) return;
+    const el = host.querySelector(`[data-i="${knobSel}"]`); if (el) el.classList.add('ksel');
+  }
+  function selectMove(dir) {
+    const btns = selButtons(); if (!btns.length) { knobSel = -1; return; }
+    let pos = btns.indexOf(knobSel); if (pos < 0) pos = dir > 0 ? -1 : 0;
+    knobSel = btns[(pos + dir + btns.length) % btns.length];
+    renderSel();
+  }
+  function knobEnter() {
+    if (knobSel >= 0 && cfg.tiles[knobSel] && cfg.tiles[knobSel].type) {   // activate the highlighted button
+      const inStrip = webMode && webStrip; (inStrip ? stripHighlight : highlight)(knobSel);
+      panelApi.launch(cfg.tiles[knobSel]);
+      setTimeout(() => { (inStrip ? stripHighlight : highlight)(-1); renderSel(); }, 180);
+      return;
+    }
+    if (cfg && cfg.app === 'music') { panelApi.media('playpause'); return; }   // music: play/pause
+    panelApi.launch({ type: 'key', value: 'enter', label: 'knob enter' });     // else: a real Enter keystroke
+  }
   let counterLocked = false;
   function updateCounter(idx, delta) {
     const t = cfg.tiles[idx];

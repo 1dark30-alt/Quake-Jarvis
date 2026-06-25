@@ -12,6 +12,7 @@ function on(channel, callback) {
 contextBridge.exposeInMainWorld('openQuakePanel', {
   launch(action) { ipcRenderer.send('launch', action); },
   volume(value) { ipcRenderer.send('volume', value); },
+  media(cmd) { ipcRenderer.send('media', cmd); },
   switchGrid(id) { ipcRenderer.send('switchGrid', id); },
   toggleRotation() { ipcRenderer.send('toggleRotation'); },
   openExternal(url) { ipcRenderer.send('openExternal', url); },
