@@ -205,6 +205,10 @@
   function devShown(id) { return (((config.settings || {}).shownDevApps) || []).includes(id); }
   function devEnabled() { return !!((config.settings || {}).devApps); }
   function appVisible(a) { return a && a.dev ? devShown(a.id) : !appHidden(a.id); }
+  async function refreshApps() {
+    try { appDefs = await configApi.getApps(); } catch (e) { appDefs = []; }
+    render();
+  }
 
   async function ensureAppIcon(value) {
     if (!value || Object.prototype.hasOwnProperty.call(appIconCache, value)) return;
@@ -718,10 +722,10 @@
       <p class="hint">Adds a strip of launcher tiles beside the app — pick the side, size, and tiles on the <b>Buttons</b> tab that appears.</p>` : ''));
     el.innerHTML = tabBar + `
       <div class="row"><label>Name</label><input id="gName" value="${esc(g.name)}"></div>
-      <div class="row"><label>App</label><select id="gApp">
+      <div class="row"><label>App</label><select id="gApp" style="flex:1;width:auto">
         <option value="">— choose an app —</option>
         ${appDefs.filter(a => a.id === g.app || appVisible(a)).map(a => `<option value="${esc(a.id)}" ${a.id === g.app ? 'selected' : ''}>${esc(a.name)}</option>`).join('')}
-      </select></div>
+      </select><button id="refreshApps" type="button" title="Reload app manifests">Refresh</button></div>
       ${optsBlock}
       ${rotRowHtml(g)}
       ${shortcutRowHtml(g)}
@@ -731,6 +735,7 @@
     const atb = document.getElementById('atBtns'); if (atb) atb.onclick = () => { dashTab = 'buttons'; render(); };
     document.getElementById('gName').oninput = e => { g.name = e.target.value; renderGrids(); markDirty(); };
     document.getElementById('gApp').onchange = e => { setApp(g, e.target.value); render(); markDirty(); };
+    document.getElementById('refreshApps').onclick = refreshApps;
     document.getElementById('gDelete').onclick = deleteCurrentPage;
     const gg = document.getElementById('gGrid');
     if (gg) gg.onchange = e => {

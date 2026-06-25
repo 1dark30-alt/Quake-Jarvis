@@ -13,8 +13,10 @@
  *   GET /grid-tiles  -> the active app page's embedded grid (resolved icons) — Music/Agenda/Events
  *   GET /media/<cmd> -> transport (play/pause/next/prev) via onMedia
  *   GET /launch?i=N  -> launch the active app grid's tile N via onLaunch (runAction)
+ *   GET /apps/<id>/… -> static files for discovered served drop-in apps  ·  /app-proxy /app-api
  */
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const metrics = require('./sysmetrics');
@@ -55,14 +57,227 @@ const STATIC_FILES = {
   '/schedule-app.js': 'application/javascript; charset=utf-8',
 };
 
-let server = null, onMedia = null, onLaunch = null, getGridTiles = null, getAppConfig = null;
+let server = null, onMedia = null, onLaunch = null, getGridTiles = null, getAppConfig = null, onOpenExternal = null;
 let sysHtml = FALLBACK, musicHtml = FALLBACK, chatHtml = FALLBACK, hascheduleHtml = FALLBACK, agendaHtml = FALLBACK, eventsHtml = FALLBACK;
 const staticAssets = {};   // request path -> { body, type }; populated at start()
+let appFolders = {};        // drop-in served app id -> { root, proxy }; supplied by main.js
+const appServers = {};      // app id -> required server module
 
 function headers(type) { return { 'Content-Type': type, 'Cache-Control': 'no-store', 'Content-Security-Policy': LOCAL_APP_CSP }; }
 function html(res, body) { res.writeHead(200, headers('text/html; charset=utf-8')); res.end(body); }
 function json(res, obj) { res.writeHead(200, headers('application/json; charset=utf-8')); res.end(JSON.stringify(obj)); }
 function done(res, ok) { res.writeHead(ok ? 200 : 400, headers('application/json')); res.end(JSON.stringify({ ok: !!ok })); }
+function setAppFolders(folders) {
+  appFolders = {};
+  Object.keys(appServers).forEach(id => { if (!folders || !folders[id]) delete appServers[id]; });
+  Object.entries(folders || {}).forEach(([id, value]) => {
+    appFolders[id] = typeof value === 'string' ? { root: value, proxy: null } : Object.assign({}, value || {});
+  });
+}
+
+const MIME = {
+  '.html': 'text/html; charset=utf-8',
+  '.htm': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.mjs': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.svg': 'image/svg+xml',
+  '.gif': 'image/gif',
+  '.webp': 'image/webp',
+  '.ico': 'image/x-icon',
+  '.woff': 'font/woff',
+  '.woff2': 'font/woff2',
+  '.ttf': 'font/ttf',
+  '.otf': 'font/otf',
+};
+function mimeFor(file) { return MIME[path.extname(file).toLowerCase()] || 'application/octet-stream'; }
+function serveDropInApp(url, res) {
+  const m = /^\/apps\/([A-Za-z0-9_-]+)\/(.+)$/.exec(url);
+  if (!m) return false;
+  const appInfo = appFolders[m[1]];
+  const root = appInfo && appInfo.root;
+  if (!root) { res.writeHead(404); res.end(); return true; }
+  let rel;
+  try { rel = decodeURIComponent(m[2]).replace(/\\/g, '/'); }
+  catch (e) { res.writeHead(400); res.end(); return true; }
+  if (!rel || rel.includes('..') || rel.startsWith('/') || /^[A-Za-z][A-Za-z0-9+.-]*:/.test(rel) || path.isAbsolute(rel)) {
+    res.writeHead(403); res.end(); return true;
+  }
+  const absRoot = path.resolve(root);
+  const file = path.resolve(absRoot, rel);
+  if (file !== absRoot && !file.startsWith(absRoot + path.sep)) { res.writeHead(403); res.end(); return true; }
+  fs.readFile(file, (err, body) => {
+    if (err) { res.writeHead(err.code === 'ENOENT' ? 404 : 500); res.end(); return; }
+    res.writeHead(200, headers(mimeFor(file)));
+    res.end(body);
+  });
+  return true;
+}
+
+function requestingAppId(req) {
+  const ref = req.headers.referer || req.headers.referrer || '';
+  if (!ref) return null;
+  try {
+    const u = new URL(ref);
+    if (u.protocol !== 'http:' || !(u.hostname === '127.0.0.1' || u.hostname === 'localhost') || Number(u.port) !== loopbackPort()) return null;
+    const m = /^\/apps\/([A-Za-z0-9_-]+)\//.exec(u.pathname);
+    return m && appFolders[m[1]] ? m[1] : null;
+  } catch (e) {
+    return null;
+  }
+}
+function queryValue(full, key) {
+  try { return new URL(full, 'http://127.0.0.1').searchParams.get(key) || ''; }
+  catch (e) { return ''; }
+}
+function queryObject(full) {
+  const out = {};
+  try { new URL(full, 'http://127.0.0.1').searchParams.forEach((value, key) => { out[key] = value; }); } catch (e) {}
+  return out;
+}
+function privateHost(hostname) {
+  const h = String(hostname || '').toLowerCase();
+  if (h === 'localhost' || h === '0.0.0.0' || h === '::1' || h.endsWith('.local')) return true;
+  if (/^127(?:\.\d{1,3}){3}$/.test(h) || /^10(?:\.\d{1,3}){3}$/.test(h) || /^192\.168(?:\.\d{1,3}){2}$/.test(h)) return true;
+  const m = /^172\.(\d{1,3})(?:\.\d{1,3}){2}$/.exec(h);
+  return !!(m && Number(m[1]) >= 16 && Number(m[1]) <= 31);
+}
+function proxyAllowed(appId, targetUrl) {
+  const appInfo = appFolders[appId];
+  const proxy = appInfo && appInfo.proxy;
+  if (!proxy) return false;
+  if (proxy.methods && Array.isArray(proxy.methods) && !proxy.methods.includes('GET')) return false;
+  let target;
+  try { target = new URL(targetUrl); } catch (e) { return false; }
+  if (target.protocol !== 'http:' && target.protocol !== 'https:') return false;
+  const allow = Array.isArray(proxy.allow) ? proxy.allow : [];
+  if (!allow.length) return false;
+  return allow.some(rule => {
+    if (rule.option) {
+      let cfg;
+      try { cfg = getAppConfig && getAppConfig(appId); } catch (e) {}
+      const baseValue = cfg && cfg.options && cfg.options[rule.option];
+      if (!baseValue) return false;
+      try {
+        const base = new URL(String(baseValue).replace(/\/+$/, '') + '/');
+        const basePath = base.pathname === '/' ? '/' : base.pathname.replace(/\/+$/, '/') ;
+        return target.origin === base.origin && (basePath === '/' || target.pathname === basePath.slice(0, -1) || target.pathname.startsWith(basePath));
+      } catch (e) {
+        return false;
+      }
+    }
+    if (privateHost(target.hostname)) return false;
+    try { return new RegExp(rule.pattern).test(target.href); }
+    catch (e) { return false; }
+  });
+}
+function verifySslFor(appId) {
+  const appInfo = appFolders[appId] || {};
+  const opt = appInfo.proxy && appInfo.proxy.verifySslOption;
+  if (!opt || !getAppConfig) return true;
+  try {
+    const cfg = getAppConfig(appId);
+    return !cfg || !cfg.options || cfg.options[opt] !== false;
+  } catch (e) {
+    return true;
+  }
+}
+function proxyFetch(targetUrl, verifySsl, redirects, cb) {
+  let target;
+  try { target = new URL(targetUrl); } catch (e) { return cb(e); }
+  const lib = target.protocol === 'https:' ? https : http;
+  const req = lib.get(target, {
+    timeout: 12000,
+    headers: { 'User-Agent': 'open-quake/NewsSpotlight', 'Accept': 'application/rss+xml, application/xml, text/xml, text/html, */*' },
+    agent: target.protocol === 'https:' && !verifySsl ? new https.Agent({ rejectUnauthorized: false }) : undefined,
+  }, upstream => {
+    const location = upstream.headers.location;
+    if (location && upstream.statusCode >= 300 && upstream.statusCode < 400 && redirects > 0) {
+      upstream.resume();
+      let next;
+      try { next = new URL(location, target).href; } catch (e) { return cb(e); }
+      return proxyFetch(next, verifySsl, redirects - 1, cb);
+    }
+    const chunks = [];
+    let size = 0;
+    upstream.on('data', chunk => {
+      size += chunk.length;
+      if (size > 5 * 1024 * 1024) req.destroy(new Error('response too large'));
+      else chunks.push(chunk);
+    });
+    upstream.on('end', () => cb(null, {
+      status: upstream.statusCode || 502,
+      type: upstream.headers['content-type'] || 'application/octet-stream',
+      body: Buffer.concat(chunks),
+    }));
+  });
+  req.on('timeout', () => req.destroy(new Error('request timed out')));
+  req.on('error', cb);
+}
+function serveAppProxy(req, res, full) {
+  const appId = requestingAppId(req);
+  const target = queryValue(full, 'url');
+  if (!appId || !proxyAllowed(appId, target)) { res.writeHead(403); res.end(); return; }
+  proxyFetch(target, verifySslFor(appId), 3, (err, result) => {
+    if (err) { res.writeHead(502, headers('text/plain; charset=utf-8')); res.end(err.message || 'proxy failed'); return; }
+    res.writeHead(result.status, headers(result.type));
+    res.end(result.body);
+  });
+}
+function appOptions(appId) {
+  try {
+    const cfg = getAppConfig && getAppConfig(appId);
+    return cfg && cfg.options || {};
+  } catch (e) {
+    return {};
+  }
+}
+function appServer(appId) {
+  const appInfo = appFolders[appId];
+  if (!appInfo || !appInfo.server) return null;
+  if (appServers[appId]) return appServers[appId];
+  const root = path.resolve(appInfo.root);
+  const serverFile = path.resolve(appInfo.server);
+  if (serverFile !== root && !serverFile.startsWith(root + path.sep)) return null;
+  try {
+    appServers[appId] = require(serverFile);
+    return appServers[appId];
+  } catch (e) {
+    console.log('app server load error:', appId, '-', e.message);
+    return null;
+  }
+}
+async function serveAppApi(req, res, full, url) {
+  const appId = requestingAppId(req);
+  const action = url.slice('/app-api/'.length);
+  if (!appId || !action) { return done(res, false); }
+  const mod = appServer(appId);
+  if (mod && typeof mod.handle === 'function') {
+    try {
+      const result = await mod.handle(action, { appId, query: queryObject(full), options: appOptions(appId) });
+      const status = result && result.ok === false && result.error === 'unknown action' ? 400 : 200;
+      res.writeHead(status, headers('application/json; charset=utf-8'));
+      res.end(JSON.stringify(result == null ? { ok: true } : result));
+      return;
+    } catch (e) {
+      res.writeHead(500, headers('application/json; charset=utf-8'));
+      res.end(JSON.stringify({ ok: false, error: e.message || 'app server failed' }));
+      return;
+    }
+  }
+  if (action !== 'open') { return done(res, false); }
+  const target = queryValue(full, 'url');
+  let ok = false;
+  try {
+    const parsed = new URL(target);
+    ok = (parsed.protocol === 'http:' || parsed.protocol === 'https:') && typeof onOpenExternal === 'function' && !!onOpenExternal(parsed.href);
+  } catch (e) {}
+  return done(res, ok);
+}
 
 // Loopback-only hardening. The server binds 127.0.0.1, but a malicious web page (or a DNS-rebinding
 // hostname that resolves to 127.0.0.1) can still try to reach it. hostOk() rejects any request whose
@@ -99,6 +314,7 @@ async function handler(req, res) {
   if (url === '/events') return html(res, eventsHtml);
   const asset = staticAssets[url];
   if (asset) { res.writeHead(200, headers(asset.type)); return res.end(asset.body); }
+  if (serveDropInApp(url, res)) return;
   // Below here: side effects (/launch, /media), live data (/metrics, /nowplaying, /musictiles), or
   // secrets (/app-config). Require the request to originate from our own served page — not a
   // cross-site fetch, image, form, or navigation.
@@ -108,6 +324,13 @@ async function handler(req, res) {
     const cfg = (m && getAppConfig) ? getAppConfig(m[1]) : null;
     return cfg ? json(res, cfg) : done(res, false);
   }
+  if (url === '/app-proxy/config') {
+    const appId = requestingAppId(req);
+    const cfg = appId && getAppConfig ? getAppConfig(appId) : null;
+    return cfg ? json(res, cfg) : done(res, false);
+  }
+  if (url === '/app-proxy') return serveAppProxy(req, res, full);
+  if (url.indexOf('/app-api/') === 0) return serveAppApi(req, res, full, url);
   if (url === '/metrics') return json(res, metrics.getSnapshot());
   if (url === '/nowplaying') return json(res, nowplaying.getSnapshot());
   if (url === '/lyrics') { try { await lyrics.ensure(nowplaying.getSnapshot()); } catch (e) {} return json(res, lyrics.getSnapshot()); }   // synced lyrics for the current track
@@ -141,6 +364,8 @@ function start(opts) {
   onLaunch = opts.onLaunch || null;
   getGridTiles = opts.getGridTiles || null;
   getAppConfig = opts.getAppConfig || null;
+  onOpenExternal = opts.onOpenExternal || null;
+  setAppFolders(opts.appFolders);
   nowplaying.setProvider(opts.getNowPlaying || null);
   return new Promise((resolve, reject) => {
     if (server) return resolve(server.address().port);
@@ -176,4 +401,4 @@ function stop() {
   if (server) { try { server.close(); } catch (e) {} server = null; }
 }
 
-module.exports = { start, stop, setActivePage };
+module.exports = { start, stop, setActivePage, setAppFolders };

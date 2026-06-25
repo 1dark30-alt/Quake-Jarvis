@@ -1,0 +1,14 @@
+{
+  "id": "my-app",
+  "name": "My App",
+  "entry": "index.html",
+  "served": false,
+  "options": [
+    {
+      "key": "message",
+      "label": "Message",
+      "type": "text",
+      "default": "Hello from a drop-in app"
+    }
+  ]
+}
