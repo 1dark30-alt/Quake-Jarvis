@@ -33,7 +33,7 @@ const LOCAL_APP_CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: file: http: https:",
   "font-src 'self' data:",
-  "connect-src 'self' http: https:",
+  "connect-src 'self' http: https: ws: wss:",
   "media-src 'self' blob: data:",
   "object-src 'none'",
   "base-uri 'none'",
@@ -55,10 +55,11 @@ const STATIC_FILES = {
   '/haschedule-ui.js': 'application/javascript; charset=utf-8',
   '/schedule.css': 'text/css; charset=utf-8',
   '/schedule-app.js': 'application/javascript; charset=utf-8',
+  '/jarvisview.js': 'application/javascript; charset=utf-8',
 };
 
 let server = null, onMedia = null, onLaunch = null, getGridTiles = null, getAppConfig = null, onOpenExternal = null;
-let sysHtml = FALLBACK, musicHtml = FALLBACK, chatHtml = FALLBACK, hascheduleHtml = FALLBACK, agendaHtml = FALLBACK, eventsHtml = FALLBACK;
+let sysHtml = FALLBACK, musicHtml = FALLBACK, chatHtml = FALLBACK, hascheduleHtml = FALLBACK, agendaHtml = FALLBACK, eventsHtml = FALLBACK, jarvisHtml = FALLBACK;
 const staticAssets = {};   // request path -> { body, type }; populated at start()
 let appFolders = {};        // drop-in served app id -> { root, proxy }; supplied by main.js
 const appServers = {};      // app id -> required server module
@@ -312,6 +313,7 @@ async function handler(req, res) {
   if (url === '/haschedule') return html(res, hascheduleHtml);
   if (url === '/agenda') return html(res, agendaHtml);
   if (url === '/events') return html(res, eventsHtml);
+  if (url === '/jarvis') return html(res, jarvisHtml);
   const asset = staticAssets[url];
   if (asset) { res.writeHead(200, headers(asset.type)); return res.end(asset.body); }
   if (serveDropInApp(url, res)) return;
@@ -375,6 +377,7 @@ function start(opts) {
     try { hascheduleHtml = fs.readFileSync(path.join(__dirname, 'haschedule.html'), 'utf8'); } catch (e) {}
     try { agendaHtml = fs.readFileSync(path.join(__dirname, 'agenda.html'), 'utf8'); } catch (e) {}
     try { eventsHtml = fs.readFileSync(path.join(__dirname, 'events.html'), 'utf8'); } catch (e) {}
+    try { jarvisHtml = fs.readFileSync(path.join(__dirname, 'jarvisview.html'), 'utf8'); } catch (e) {}
     for (const [route, type] of Object.entries(STATIC_FILES)) {
       try { staticAssets[route] = { body: fs.readFileSync(path.join(__dirname, route.slice(1)), 'utf8'), type }; } catch (e) {}
     }

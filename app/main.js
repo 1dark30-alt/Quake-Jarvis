@@ -1,6 +1,8 @@
 'use strict';
 // DK-QUAKE launcher: multi-grid panel + PC config editor, on the open Aris68Connector driver.
 const { app, BrowserWindow, Tray, Menu, nativeImage, screen, powerSaveBlocker, ipcMain, shell, dialog, session, net, safeStorage, clipboard, globalShortcut, nativeTheme } = require('electron');
+app.commandLine.appendSwitch('ignore-certificate-errors');
+app.commandLine.appendSwitch('allow-insecure-localhost');
 const path = require('path');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -145,6 +147,23 @@ function ensureMusicPage() {
   g.gridAlign = 'right';                                   // music grid is always far right (album art is far left)
   saveConfig();
 }
+function ensureJarvisPage() {
+  if (!config.grids) config.grids = [];
+  let g = config.grids.find(x => x.id === 'jarvis');
+  if (!g) {
+    if (config.jarvisInjected) return;
+    g = { id: 'jarvis' }; config.grids.push(g); config.jarvisInjected = true;
+  }
+  g.name = g.name || 'JARVIS';
+  g.kind = 'app'; g.app = 'jarvis';
+  delete g.url; delete g.auth;
+  if (!g.options) {
+    g.options = { endpoint: 'http://127.0.0.1:8000', pin: 'QUAKE' };
+  } else if (g.options.pin !== 'QUAKE') {
+    g.options.pin = 'QUAKE';
+  }
+  saveConfig();
+}
 // An app's embedded grid (Music, Agenda, Events, …) is served to the page (resolved icons) and its taps
 // launched — generic across any app that defines a grid, keyed to whichever app page is currently shown.
 async function getActiveAppTiles() {
@@ -184,7 +203,7 @@ function trustedMediaOrigins() {
 function isLocalChatUrl(value) {
   try {
     const url = new URL(value);
-    return url.protocol === 'http:' && url.hostname === '127.0.0.1' && Number(url.port) === serverPort && url.pathname === '/chat';
+    return url.protocol === 'http:' && url.hostname === '127.0.0.1' && Number(url.port) === serverPort && (url.pathname === '/chat' || url.pathname === '/jarvis');
   } catch (e) {
     return false;
   }
@@ -197,7 +216,9 @@ function isTrustedMediaRequest(wc, details) {
   catch (e) { return false; }
 }
 function handleDashboardPermissionRequest(wc, permission, cb, details) {
-  if (permission === 'media' && isTrustedMediaRequest(wc, details)) return cb(true);
+  const granted = permission === 'media' && isTrustedMediaRequest(wc, details);
+  console.log(`[Permission] Requesting ${permission} for ${wc ? wc.getURL() : 'unknown'}. Details:`, JSON.stringify(details), `Granted: ${granted}`);
+  if (granted) return cb(true);
   return cb(false);
 }
 
@@ -467,12 +488,11 @@ async function pushToPanel() {
   }
 }
 
-// Read a local image file into a data: URL so it renders in ANY panel page — including the http-served
-// app pages (Music), which (unlike the native grid) cannot load file:// images.
 function imageFileToDataUrl(p) {
   try {
-    const buf = fs.readFileSync(p);
-    const ext = path.extname(p).slice(1).toLowerCase();
+    const resolvedPath = path.isAbsolute(p) ? p : path.resolve(__dirname, p);
+    const buf = fs.readFileSync(resolvedPath);
+    const ext = path.extname(resolvedPath).slice(1).toLowerCase();
     const mime = ext === 'svg' ? 'image/svg+xml' : (ext === 'jpg' || ext === 'jpeg') ? 'image/jpeg' : ext === 'ico' ? 'image/x-icon' : 'image/' + (ext || 'png');
     return 'data:' + mime + ';base64,' + buf.toString('base64');
   } catch (e) { return null; }
@@ -966,9 +986,9 @@ app.whenReady().then(async () => {
   try {
     sysserver = require('./sysserver');
     serverPort = await sysserver.start({ onMedia: mediaKey, onLaunch: onAppLaunch, getGridTiles: getActiveAppTiles, getAppConfig: activeServedAppConfig, onOpenExternal: openExternalUrl, appFolders: discoveredServedApps() });
-    ensureSystemViewPage(serverPort); ensureMusicPage(); ensureDropInDir();
+    ensureSystemViewPage(serverPort); ensureMusicPage(); ensureJarvisPage(); ensureDropInDir();
     const env = loadEnv(); haschedule.configure({ url: env.HA_URL, token: env.HA_TOKEN });   // HA Schedule dev app creds
-    console.log('SystemView + Music on http://127.0.0.1:' + serverPort + (env.HA_URL ? ' · HA Schedule -> ' + env.HA_URL : ''));
+    console.log('SystemView + Music + JARVIS on http://127.0.0.1:' + serverPort + (env.HA_URL ? ' · HA Schedule -> ' + env.HA_URL : ''));
   } catch (e) { console.log('local panel services failed to start:', e.message); }
   sweepIconCache();   // clean up orphaned URL-icon cache files left by prior sessions
 
@@ -993,6 +1013,15 @@ app.whenReady().then(async () => {
     if (g && g.kind === 'web' && g.auth && g.auth.type === 'basic' && hostMatches(g.url, request.url)) {
       event.preventDefault();
       callback(g.auth.user || '', g.auth.pass || '');
+    }
+  });
+  app.on('certificate-error', (event, webContents, url, error, certificate, callback) => {
+    if (url.startsWith('https://127.0.0.1:') || url.startsWith('https://localhost:') ||
+        url.startsWith('wss://127.0.0.1:') || url.startsWith('wss://localhost:')) {
+      event.preventDefault();
+      callback(true);
+    } else {
+      callback(false);
     }
   });
   app.on('web-contents-created', (e, contents) => {

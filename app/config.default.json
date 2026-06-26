@@ -7,22 +7,132 @@
       "cols": 8,
       "rows": 2,
       "tiles": [
-        { "label": "Chrome",   "icon": "🌐", "type": "app",    "value": "chrome" },
-        { "label": "Edge",     "icon": "🧭", "type": "app",    "value": "msedge" },
-        { "label": "Files",    "icon": "📁", "type": "app",    "value": "explorer" },
-        { "label": "Notepad",  "icon": "📝", "type": "app",    "value": "notepad" },
-        { "label": "Calc",     "icon": "🧮", "type": "app",    "value": "calc" },
-        { "label": "Tasks",    "icon": "📊", "type": "app",    "value": "taskmgr" },
-        { "label": "Terminal", "icon": "🖥️", "type": "app",    "value": "wt" },
-        { "label": "Settings", "icon": "⚙️", "type": "cmd",    "value": "start ms-settings:" },
-        { "label": "GitHub",   "icon": "🐙", "type": "url",    "value": "https://github.com" },
-        { "label": "Snip",     "icon": "✂️", "type": "app",    "value": "snippingtool" },
-        { "label": "Lock",     "icon": "🔒", "type": "system", "value": "lock" },
-        { "label": "Paint",    "icon": "🎨", "type": "app",    "value": "mspaint" },
-        { "label": "VS Code",  "icon": "🧩", "type": "app",    "value": "code" },
-        { "label": "Control",  "icon": "🛠️", "type": "app",    "value": "control" },
-        { "label": "Spotify",  "icon": "🎵", "type": "url",    "value": "https://open.spotify.com" },
-        { "label": "Edit Grids","icon": "✏️","type": "system", "value": "config" }
+        {
+          "label": "Chrome",
+          "icon": "\ud83c\udf10",
+          "type": "app",
+          "value": "chrome",
+          "iconType": "image",
+          "iconImage": "assets/icons/chrome.svg"
+        },
+        {
+          "label": "Edge",
+          "icon": "\ud83e\udded",
+          "type": "app",
+          "value": "msedge",
+          "iconType": "image",
+          "iconImage": "assets/icons/msedge.svg"
+        },
+        {
+          "label": "Files",
+          "icon": "\ud83d\udcc1",
+          "type": "app",
+          "value": "explorer",
+          "iconType": "image",
+          "iconImage": "assets/icons/explorer.svg"
+        },
+        {
+          "label": "Notepad",
+          "icon": "\ud83d\udcdd",
+          "type": "app",
+          "value": "notepad"
+        },
+        {
+          "label": "Calc",
+          "icon": "\ud83e\uddee",
+          "type": "app",
+          "value": "calc",
+          "iconType": "image",
+          "iconImage": "assets/icons/calc.svg"
+        },
+        {
+          "label": "Tasks",
+          "icon": "\ud83d\udcca",
+          "type": "app",
+          "value": "taskmgr",
+          "iconType": "image",
+          "iconImage": "assets/icons/taskmgr.svg"
+        },
+        {
+          "label": "Terminal",
+          "icon": "\ud83d\udda5\ufe0f",
+          "type": "app",
+          "value": "wt",
+          "iconType": "image",
+          "iconImage": "assets/icons/wt.svg"
+        },
+        {
+          "label": "Settings",
+          "icon": "\u2699\ufe0f",
+          "type": "cmd",
+          "value": "start ms-settings:",
+          "iconType": "image",
+          "iconImage": "assets/icons/settings.svg"
+        },
+        {
+          "label": "GitHub",
+          "icon": "\ud83d\udc19",
+          "type": "url",
+          "value": "https://github.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/github.svg"
+        },
+        {
+          "label": "Snip",
+          "icon": "\u2702\ufe0f",
+          "type": "app",
+          "value": "snippingtool",
+          "iconType": "image",
+          "iconImage": "assets/icons/snippingtool.svg"
+        },
+        {
+          "label": "Lock",
+          "icon": "\ud83d\udd12",
+          "type": "system",
+          "value": "lock",
+          "iconType": "image",
+          "iconImage": "assets/icons/lock.svg"
+        },
+        {
+          "label": "Paint",
+          "icon": "\ud83c\udfa8",
+          "type": "app",
+          "value": "mspaint",
+          "iconType": "image",
+          "iconImage": "assets/icons/mspaint.svg"
+        },
+        {
+          "label": "VS Code",
+          "icon": "\ud83e\udde9",
+          "type": "app",
+          "value": "code",
+          "iconType": "image",
+          "iconImage": "assets/icons/code.svg"
+        },
+        {
+          "label": "Control",
+          "icon": "\ud83d\udee0\ufe0f",
+          "type": "app",
+          "value": "control",
+          "iconType": "image",
+          "iconImage": "assets/icons/control.svg"
+        },
+        {
+          "label": "Spotify",
+          "icon": "\ud83c\udfb5",
+          "type": "url",
+          "value": "https://open.spotify.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/spotify.svg"
+        },
+        {
+          "label": "Edit Grids",
+          "icon": "\u270f\ufe0f",
+          "type": "system",
+          "value": "config",
+          "iconType": "image",
+          "iconImage": "assets/icons/config.svg"
+        }
       ]
     },
     {
@@ -31,46 +141,215 @@
       "cols": 10,
       "rows": 4,
       "tiles": [
-        { "label": "Spotify",  "icon": "🎵", "type": "url", "value": "https://open.spotify.com", "w": 4, "h": 4 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "label": "YouTube",  "icon": "📺", "type": "url", "value": "https://youtube.com", "w": 2, "h": 2 },
-        { "cover": 4 },
-        { "label": "Netflix",  "icon": "🍿", "type": "url", "value": "https://www.netflix.com", "w": 2, "h": 2 },
-        { "cover": 6 },
-        { "label": "Twitch",   "icon": "🎮", "type": "url", "value": "https://twitch.tv" },
-        { "label": "Disney+",  "icon": "🏰", "type": "url", "value": "https://www.disneyplus.com" },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 4 },
-        { "cover": 4 },
-        { "cover": 6 },
-        { "cover": 6 },
-        { "label": "Prime",    "icon": "📦", "type": "url", "value": "https://www.primevideo.com" },
-        { "label": "Plex",     "icon": "🎬", "type": "url", "value": "https://app.plex.tv" },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "label": "OBS",      "icon": "🎥", "type": "app", "value": "obs64" },
-        { "label": "Discord",  "icon": "💬", "type": "app", "value": "discord" },
-        { "label": "Volume",   "icon": "🎚️", "type": "cmd", "value": "start sndvol" },
-        { "label": "YT Music", "icon": "🎶", "type": "url", "value": "https://music.youtube.com" },
-        { "label": "SoundCloud","icon": "☁️","type": "url", "value": "https://soundcloud.com" },
-        { "label": "Apple Music","icon": "🍎","type": "url", "value": "https://music.apple.com" },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "cover": 0 },
-        { "label": "Pandora",  "icon": "📻", "type": "url", "value": "https://www.pandora.com" },
-        { "label": "Bandcamp", "icon": "🎸", "type": "url", "value": "https://bandcamp.com" },
-        { "label": "Last.fm",  "icon": "📊", "type": "url", "value": "https://www.last.fm" },
-        { "label": "Tidal",    "icon": "🌊", "type": "url", "value": "https://listen.tidal.com" },
-        { "label": "Deezer",   "icon": "🟣", "type": "url", "value": "https://www.deezer.com" },
-        { "label": "Edit Grids","icon": "✏️","type": "system", "value": "config" }
+        {
+          "label": "Spotify",
+          "icon": "\ud83c\udfb5",
+          "type": "url",
+          "value": "https://open.spotify.com",
+          "w": 4,
+          "h": 4,
+          "iconType": "image",
+          "iconImage": "assets/icons/spotify.svg"
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "label": "YouTube",
+          "icon": "\ud83d\udcfa",
+          "type": "url",
+          "value": "https://youtube.com",
+          "w": 2,
+          "h": 2,
+          "iconType": "image",
+          "iconImage": "assets/icons/youtube.svg"
+        },
+        {
+          "cover": 4
+        },
+        {
+          "label": "Netflix",
+          "icon": "\ud83c\udf7f",
+          "type": "url",
+          "value": "https://www.netflix.com",
+          "w": 2,
+          "h": 2,
+          "iconType": "image",
+          "iconImage": "assets/icons/netflix.svg"
+        },
+        {
+          "cover": 6
+        },
+        {
+          "label": "Twitch",
+          "icon": "\ud83c\udfae",
+          "type": "url",
+          "value": "https://twitch.tv",
+          "iconType": "image",
+          "iconImage": "assets/icons/twitch.svg"
+        },
+        {
+          "label": "Disney+",
+          "icon": "\ud83c\udff0",
+          "type": "url",
+          "value": "https://www.disneyplus.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/disney.svg"
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 4
+        },
+        {
+          "cover": 4
+        },
+        {
+          "cover": 6
+        },
+        {
+          "cover": 6
+        },
+        {
+          "label": "Prime",
+          "icon": "\ud83d\udce6",
+          "type": "url",
+          "value": "https://www.primevideo.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/prime.svg"
+        },
+        {
+          "label": "Plex",
+          "icon": "\ud83c\udfac",
+          "type": "url",
+          "value": "https://app.plex.tv",
+          "iconType": "image",
+          "iconImage": "assets/icons/plex.svg"
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "label": "OBS",
+          "icon": "\ud83c\udfa5",
+          "type": "app",
+          "value": "obs64",
+          "iconType": "image",
+          "iconImage": "assets/icons/obs.svg"
+        },
+        {
+          "label": "Discord",
+          "icon": "\ud83d\udcac",
+          "type": "app",
+          "value": "discord",
+          "iconType": "image",
+          "iconImage": "assets/icons/discord.svg"
+        },
+        {
+          "label": "Volume",
+          "icon": "\ud83c\udf9a\ufe0f",
+          "type": "cmd",
+          "value": "start sndvol"
+        },
+        {
+          "label": "YT Music",
+          "icon": "\ud83c\udfb6",
+          "type": "url",
+          "value": "https://music.youtube.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/ytmusic.svg"
+        },
+        {
+          "label": "SoundCloud",
+          "icon": "\u2601\ufe0f",
+          "type": "url",
+          "value": "https://soundcloud.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/soundcloud.svg"
+        },
+        {
+          "label": "Apple Music",
+          "icon": "\ud83c\udf4e",
+          "type": "url",
+          "value": "https://music.apple.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/applemusic.svg"
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "cover": 0
+        },
+        {
+          "label": "Pandora",
+          "icon": "\ud83d\udcfb",
+          "type": "url",
+          "value": "https://www.pandora.com"
+        },
+        {
+          "label": "Bandcamp",
+          "icon": "\ud83c\udfb8",
+          "type": "url",
+          "value": "https://bandcamp.com"
+        },
+        {
+          "label": "Last.fm",
+          "icon": "\ud83d\udcca",
+          "type": "url",
+          "value": "https://www.last.fm"
+        },
+        {
+          "label": "Tidal",
+          "icon": "\ud83c\udf0a",
+          "type": "url",
+          "value": "https://listen.tidal.com"
+        },
+        {
+          "label": "Deezer",
+          "icon": "\ud83d\udfe3",
+          "type": "url",
+          "value": "https://www.deezer.com"
+        },
+        {
+          "label": "Edit Grids",
+          "icon": "\u270f\ufe0f",
+          "type": "system",
+          "value": "config",
+          "iconType": "image",
+          "iconImage": "assets/icons/config.svg"
+        }
       ]
     },
     {
@@ -79,22 +358,114 @@
       "cols": 8,
       "rows": 2,
       "tiles": [
-        { "label": "VS Code",  "icon": "🧩", "type": "app", "value": "code" },
-        { "label": "Terminal", "icon": "🖥️", "type": "app", "value": "wt" },
-        { "label": "GitHub",   "icon": "🐙", "type": "url", "value": "https://github.com" },
-        { "label": "localhost","icon": "🌍", "type": "url", "value": "http://localhost:3000" },
-        { "label": "Tasks",    "icon": "📊", "type": "app", "value": "taskmgr" },
-        { "label": "",         "icon": "",   "type": "",    "value": "" },
-        { "label": "",         "icon": "",   "type": "",    "value": "" },
-        { "label": "Edit Grids","icon": "✏️","type": "system","value": "config" },
-        { "label": "", "icon": "", "type": "", "value": "" },
-        { "label": "", "icon": "", "type": "", "value": "" },
-        { "label": "", "icon": "", "type": "", "value": "" },
-        { "label": "", "icon": "", "type": "", "value": "" },
-        { "label": "", "icon": "", "type": "", "value": "" },
-        { "label": "", "icon": "", "type": "", "value": "" },
-        { "label": "", "icon": "", "type": "", "value": "" },
-        { "label": "", "icon": "", "type": "", "value": "" }
+        {
+          "label": "VS Code",
+          "icon": "\ud83e\udde9",
+          "type": "app",
+          "value": "code",
+          "iconType": "image",
+          "iconImage": "assets/icons/code.svg"
+        },
+        {
+          "label": "Terminal",
+          "icon": "\ud83d\udda5\ufe0f",
+          "type": "app",
+          "value": "wt",
+          "iconType": "image",
+          "iconImage": "assets/icons/wt.svg"
+        },
+        {
+          "label": "GitHub",
+          "icon": "\ud83d\udc19",
+          "type": "url",
+          "value": "https://github.com",
+          "iconType": "image",
+          "iconImage": "assets/icons/github.svg"
+        },
+        {
+          "label": "localhost",
+          "icon": "\ud83c\udf0d",
+          "type": "url",
+          "value": "http://localhost:3000"
+        },
+        {
+          "label": "Tasks",
+          "icon": "\ud83d\udcca",
+          "type": "app",
+          "value": "taskmgr",
+          "iconType": "image",
+          "iconImage": "assets/icons/taskmgr.svg"
+        },
+        {
+          "label": "Start Jarvis",
+          "icon": "🤖",
+          "type": "cmd",
+          "value": "c:\\Users\\darkn\\Quake - jarvis\\Quake-Jarvis\\start_jarvis.vbs",
+          "iconType": "image",
+          "iconImage": "assets/icons/jarvis.svg"
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "Edit Grids",
+          "icon": "\u270f\ufe0f",
+          "type": "system",
+          "value": "config",
+          "iconType": "image",
+          "iconImage": "assets/icons/config.svg"
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        },
+        {
+          "label": "",
+          "icon": "",
+          "type": "",
+          "value": ""
+        }
       ]
     },
     {
@@ -102,21 +473,30 @@
       "name": "Flip Clock",
       "kind": "app",
       "app": "clock",
-      "options": { "mode": "12", "theme": "dark", "seconds": false, "date": true }
+      "options": {
+        "mode": "12",
+        "theme": "dark",
+        "seconds": false,
+        "date": true
+      }
     },
     {
       "id": "weather",
       "name": "Weather",
       "kind": "web",
       "url": "https://www.windy.com/?39.809,-98.597,4",
-      "auth": { "type": "none" }
+      "auth": {
+        "type": "none"
+      }
     },
     {
       "id": "ha-demo",
       "name": "Home Assistant",
       "kind": "web",
       "url": "https://demo.home-assistant.io/",
-      "auth": { "type": "none" }
+      "auth": {
+        "type": "none"
+      }
     }
   ]
 }

@@ -5,7 +5,7 @@
       var key = cfg.apiKey || '';
       var sttUrl = '';
       try { sttUrl = new URL(cfg.endpoint).origin + '/api/v1/audio/transcriptions'; } catch (e) {}
-      var rec = null, chunks = [], stream = null, recording = false, cue = null;
+      var rec = null, chunks = [], stream = null, recording = false, cue = null, stopTimer = null;
 
       function showCue(on) {
         if (!cue) {
@@ -21,17 +21,26 @@
         if (stream) return stream;
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });   // unlocks device labels
         try {
-          var devs = await navigator.mediaDevices.enumerateDevices();
-          var pnp = devs.find(function (d) { return d.kind === 'audioinput' && /pnp|usb pnp|usb audio/i.test(d.label); });
-          if (pnp && stream.getAudioTracks()[0].getSettings().deviceId !== pnp.deviceId) {
-            stream.getTracks().forEach(function (t) { t.stop(); });
-            stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: pnp.deviceId } } });
+          var isWin = navigator.platform.indexOf('Win') !== -1 || navigator.userAgent.indexOf('Windows') !== -1;
+          if (!isWin) {
+            var devs = await navigator.mediaDevices.enumerateDevices();
+            var pnp = devs.find(function (d) { return d.kind === 'audioinput' && /pnp|usb pnp|usb audio/i.test(d.label); });
+            if (pnp && stream.getAudioTracks()[0].getSettings().deviceId !== pnp.deviceId) {
+              stream.getTracks().forEach(function (t) { t.stop(); });
+              stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: { exact: pnp.deviceId } } });
+            }
           }
         } catch (e) {}
         return stream;
       }
 
       window.pttStart = async function () {
+        if (stopTimer) {
+          clearTimeout(stopTimer);
+          stopTimer = null;
+          console.log('[PTT] pttStart() - cancelled pending stop, continuing recording.');
+          return;
+        }
         if (recording || !sttUrl || !key) return;
         try {
           var s = await getMic();
@@ -42,8 +51,13 @@
         } catch (e) { console.log('ptt start:', e.message); }
       };
       window.pttStop = function () {
-        if (!recording) return; recording = false;
-        try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) {}
+        if (!recording) return;
+        if (stopTimer) clearTimeout(stopTimer);
+        stopTimer = setTimeout(function () {
+          recording = false;
+          try { if (rec && rec.state !== 'inactive') rec.stop(); } catch (e) {}
+          stopTimer = null;
+        }, 800);
       };
 
       async function transcribe(blob) {

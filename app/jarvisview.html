@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' http: https: file: data: blob:; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file: http: https:; font-src 'self' data:; connect-src 'self' http: https: ws: wss:; media-src 'self' blob: data:; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none';">
+<title>JARVIS Voice Assistant</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { font-size: 19px; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #05080d; font-family: "Segoe UI", system-ui, sans-serif; color: #e8eef6; }
+  
+  /* Main Container */
+  .container { display: flex; width: 1920px; height: 480px; padding: 20px; gap: 20px; position: relative; }
+  
+  /* Left Panel: Orb & Status */
+  .left-panel { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 500px; height: 100%; background: linear-gradient(160deg, #0a1424, #05080d); border: 1px solid #1a2a40; border-radius: 20px; position: relative; }
+  .status-label { font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px; color: #7ce7ff; margin-bottom: 20px; text-shadow: 0 0 10px rgba(0, 240, 255, 0.4); }
+  
+  /* Glowing Orb Visualizer */
+  .orb-container { position: relative; width: 160px; height: 160px; display: flex; align-items: center; justify-content: center; }
+  .orb-ring { position: absolute; border-radius: 50%; border: 2px solid transparent; box-sizing: border-box; pointer-events: none; }
+  .ring-1 { width: 160px; height: 160px; border-top-color: #00f0ff; border-bottom-color: #00f0ff; animation: rotate 4s linear infinite; filter: drop-shadow(0 0 8px rgba(0, 240, 255, 0.5)); }
+  .ring-2 { width: 130px; height: 130px; border-left-color: #7ce7ff; border-right-color: #7ce7ff; animation: rotate-rev 3s linear infinite; filter: drop-shadow(0 0 6px rgba(124, 231, 255, 0.4)); }
+  .orb-center { width: 90px; height: 90px; background: radial-gradient(circle, #00f0ff 0%, #036888 70%, #05080d 100%); border-radius: 50%; box-shadow: 0 0 30px #00f0ff; transition: all 0.3s ease; cursor: pointer; }
+  
+  /* Orb Status States */
+  .container.state-sleeping .orb-center { background: radial-gradient(circle, #005f73 0%, #001219 70%, #05080d 100%); box-shadow: 0 0 15px #005f73; }
+  .container.state-sleeping .status-label { color: #0096c7; text-shadow: none; }
+  .container.state-sleeping .ring-1 { border-top-color: #0077b6; border-bottom-color: #0077b6; animation-duration: 8s; }
+  .container.state-sleeping .ring-2 { border-left-color: #0096c7; border-right-color: #0096c7; animation-duration: 6s; }
+
+  .container.state-listening .orb-center { background: radial-gradient(circle, #39FF14 0%, #178007 70%, #05080d 100%); box-shadow: 0 0 35px #39FF14; animation: pulse 0.8s ease-in-out infinite alternate; }
+  .container.state-listening .status-label { color: #39FF14; text-shadow: 0 0 10px rgba(57, 255, 20, 0.4); }
+  .container.state-listening .ring-1 { border-top-color: #39FF14; border-bottom-color: #39FF14; animation-duration: 2s; }
+  .container.state-listening .ring-2 { border-left-color: #39FF14; border-right-color: #39FF14; animation-duration: 1.5s; }
+
+  .container.state-speaking .orb-center { background: radial-gradient(circle, #ff007f 0%, #9b004f 70%, #05080d 100%); box-shadow: 0 0 40px #ff007f; animation: ripple 0.6s linear infinite alternate; }
+  .container.state-speaking .status-label { color: #ff007f; text-shadow: 0 0 10px rgba(255, 0, 127, 0.4); }
+  .container.state-speaking .ring-1 { border-top-color: #ff007f; border-bottom-color: #ff007f; animation-duration: 1s; }
+  .container.state-speaking .ring-2 { border-left-color: #ff007f; border-right-color: #ff007f; animation-duration: 0.8s; }
+
+  .container.state-thinking .orb-center { background: radial-gradient(circle, #7209b7 0%, #3f0761 70%, #05080d 100%); box-shadow: 0 0 30px #7209b7; }
+  .container.state-thinking .status-label { color: #b5179e; text-shadow: 0 0 10px rgba(181, 23, 158, 0.4); }
+  .container.state-thinking .ring-1 { border-top-color: #7209b7; border-bottom-color: #b5179e; animation: rotate 0.5s linear infinite; }
+  .container.state-thinking .ring-2 { border-left-color: #b5179e; border-right-color: #7209b7; animation: rotate-rev 0.4s linear infinite; }
+
+  /* Audio Visualizer Waves (Sleeping/Active) */
+  .wave-hint { margin-top: 25px; font-size: 13px; color: #5f7790; text-align: center; }
+  .wave-hint span { color: #7ce7ff; font-weight: bold; }
+
+  /* Right Panel: Conversation Log */
+  .right-panel { display: flex; flex-direction: column; flex: 1; height: 100%; background: linear-gradient(160deg, #0a1119, #05080d); border: 1px solid #1a2330; border-radius: 20px; overflow: hidden; }
+  .panel-header { display: flex; justify-content: space-between; align-items: center; padding: 15px 20px; background: #0b1119; border-bottom: 1px solid #1a2330; }
+  .panel-title { font-size: 16px; font-weight: 700; color: #8899aa; text-transform: uppercase; letter-spacing: 1px; }
+  .clear-btn { font-size: 13px; color: #5f7790; background: none; border: none; cursor: pointer; transition: color 0.15s; }
+  .clear-btn:hover { color: #ff4d4d; }
+  .messages-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 15px; scrollbar-width: thin; scrollbar-color: #1a2330 #05080d; }
+  
+  /* Conversation Messages */
+  .msg { max-width: 85%; padding: 12px 16px; border-radius: 18px; line-height: 1.5; font-size: 15px; animation: slide-up 0.2s ease-out; word-break: break-word; }
+  .msg.user { align-self: flex-end; background: linear-gradient(135deg, #0e2a47, #07192b); border: 1px solid #1c3c5e; color: #e8eef6; border-bottom-right-radius: 4px; }
+  .msg.jarvis { align-self: flex-start; background: linear-gradient(135deg, #0f2430, #08151c); border: 1px solid #143547; color: #cfe0f2; border-bottom-left-radius: 4px; }
+  .msg.sys { align-self: center; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); color: #8899aa; font-size: 13px; padding: 6px 12px; border-radius: 12px; }
+
+  /* Animations */
+  @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  @keyframes rotate-rev { from { transform: rotate(360deg); } to { transform: rotate(0deg); } }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.15); } }
+  @keyframes ripple { from { transform: scale(1); box-shadow: 0 0 25px #ff007f; } to { transform: scale(1.1); box-shadow: 0 0 50px #ff007f; } }
+  @keyframes slide-up { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+
+  /* Setup Overlay (Glassmorphism Modal) */
+  .overlay { position: absolute; inset: 0; background: rgba(5, 8, 13, 0.95); display: none; align-items: center; justify-content: center; z-index: 100; animation: fade-in 0.25s; }
+  .overlay.open { display: flex; }
+  .setup-card { width: 520px; padding: 30px; background: linear-gradient(160deg, #0b1424, #05080d); border: 1px solid #203654; border-radius: 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.8); }
+  .setup-icon { font-size: 64px; margin-bottom: 15px; }
+  .setup-title { font-size: 22px; font-weight: 800; color: #fff; margin-bottom: 10px; }
+  .setup-desc { font-size: 14px; color: #8899aa; line-height: 1.6; margin-bottom: 25px; }
+  .pin-display { font-size: 32px; font-weight: 800; color: #7ce7ff; background: rgba(0,240,255,0.07); border: 1px dashed rgba(0,240,255,0.3); padding: 12px; border-radius: 10px; margin-bottom: 15px; letter-spacing: 3px; }
+  .setup-btn { background: #00f0ff; color: #05080d; font-size: 15px; font-weight: 700; padding: 10px 24px; border: none; border-radius: 20px; cursor: pointer; transition: all 0.15s; }
+  .setup-btn:hover { background: #7ce7ff; box-shadow: 0 0 15px rgba(0,240,255,0.4); }
+  
+  .desktop-ui-btn {
+    margin-top: 25px;
+    background: rgba(0, 240, 255, 0.08);
+    color: #7ce7ff;
+    border: 1px solid rgba(0, 240, 255, 0.3);
+    border-radius: 12px;
+    padding: 7px 16px;
+    font-size: 12px;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.15s;
+    outline: none;
+  }
+  .desktop-ui-btn:hover {
+    background: rgba(0, 240, 255, 0.18);
+    border-color: #00f0ff;
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.3);
+  }
+</style>
+</head>
+<body>
+  <div class="container state-sleeping" id="app-container">
+    <!-- Left panel: AI status orb -->
+    <div class="left-panel">
+      <div class="status-label" id="status-text">Jarvis Sleeping</div>
+      <div class="orb-container">
+        <div class="orb-ring ring-1"></div>
+        <div class="orb-ring ring-2"></div>
+        <div class="orb-center" id="orb-trigger"></div>
+      </div>
+      <div class="wave-hint" id="knob-hint">Hold <span>device knob</span> or tap Orb to talk</div>
+      <button class="desktop-ui-btn" id="toggle-desktop-ui">Show Desktop UI</button>
+    </div>
+
+    <!-- Right panel: Conversation logs -->
+    <div class="right-panel">
+      <div class="panel-header">
+        <div class="panel-title">Conversation Log</div>
+        <button class="clear-btn" id="clear-log">Clear</button>
+      </div>
+      <div class="messages-container" id="feed">
+        <!-- Message list populated dynamically -->
+        <div class="msg sys">Welcome to JARVIS. Connecting to backend...</div>
+      </div>
+    </div>
+
+    <!-- Security PIN Pairing Overlay -->
+    <div class="overlay" id="pairing-overlay">
+      <div class="setup-card">
+        <div class="setup-icon">🤖</div>
+        <div class="setup-title">Pairing Required</div>
+        <div class="setup-desc">
+          Please pair your device with the JARVIS Assistant.<br>
+          Open the JARVIS Desktop UI, click <b>Remote Control</b>, and enter the pairing PIN in the open-quake app settings.
+        </div>
+        <div class="pin-display" id="pairing-status">Pairing Pending...</div>
+        <button class="setup-btn" id="retry-pairing">Check Connection</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/jarvisview.js"></script>
+</body>
+</html>

@@ -3063,5 +3063,15 @@
         ]
       }
     ]
+  },
+  {
+    "id": "jarvis",
+    "name": "JARVIS",
+    "file": "jarvisview.html",
+    "served": true,
+    "options": [
+      { "key": "endpoint", "label": "JARVIS Server URL", "type": "text", "default": "http://127.0.0.1:8000" },
+      { "key": "pin",      "label": "Pairing PIN (from JARVIS Remote Control)", "type": "secret", "default": "" }
+    ]
   }
 ]

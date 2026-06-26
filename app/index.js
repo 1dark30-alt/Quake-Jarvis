@@ -369,7 +369,7 @@
       return;
     }
     if (k.type === 'hold') {   // press-and-hold -> push-to-talk; the served chat page defines window.pttStart/Stop
-      if (webMode && webReady) web.executeJavaScript(k.phase === 'start' ? 'window.pttStart&&window.pttStart()' : 'window.pttStop&&window.pttStop()').catch(function () {});
+      if (webMode) web.executeJavaScript(k.phase === 'start' ? 'window.pttStart&&window.pttStart()' : 'window.pttStop&&window.pttStop()').catch(function () {});
       return;
     }
     if (k.type === 'rotate') {

@@ -55,7 +55,11 @@ async function launchApp(value, deps) {
 
 function runShellCommand(value, deps) {
   if (!value || typeof value !== 'string') return false;
-  deps.exec(value, { windowsHide: true });
+  let cmd = value;
+  if (deps.fs && deps.fs.existsSync(value)) {
+    cmd = `"${value}"`;
+  }
+  deps.exec(cmd, { windowsHide: true });
   return true;
 }
 

@@ -25,7 +25,11 @@ contextBridge.exposeInMainWorld('openQuakeConfig', {
   setLighting(lighting) { ipcRenderer.send('setLighting', lighting); },
   saveLightingToDevice() { return ipcRenderer.invoke('saveLightingToDevice'); },
   pathToFileURL(filePath) {
-    try { return pathToFileURL(filePath).href; }
+    try {
+      const p = require('path');
+      const resolved = p.isAbsolute(filePath) ? filePath : p.resolve(__dirname, filePath);
+      return pathToFileURL(resolved).href;
+    }
     catch (e) { return ''; }
   },
   // Read a local image into a data: URL — the same thing the panel does (main.js imageFileToDataUrl), so
