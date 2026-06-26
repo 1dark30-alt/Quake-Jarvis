@@ -1,6 +1,17 @@
-# open-quake
+# open-quake (JARVIS Integration Fork)
 
 > **Disclaimer:** open-quake is an independent third-party community project. It is not affiliated with, endorsed by, maintained by, verified by, certified by, or officially supported by DECOKEE. DK-Suite is the official software for DECOKEE Quake. open-quake is not an official open-source version of DK-Suite. Use of open-quake is at your own risk.
+
+This is a customized fork of `open-quake` that integrates the **JARVIS Voice Assistant (Mark-XLVI)** backend, introduces neon cybernetic styling, and implements windowless background startup.
+
+### 💖 Credits & Acknowledgments
+This project is built upon the incredible work of two original projects:
+*   **[open-quake](https://github.com/TeeJS/open-quake)** by **TeeJS** — the open driver and multi-grid touchscreen launcher for the DK-QUAKE / ARIS-68 device.
+*   **[Mark-XLVI](https://github.com/FatihMakes/Mark-XLVI)** by **FatihMakes** — the ultimate cross-platform real-time Gemini voice AI assistant.
+
+A massive thank you to **TeeJS** and **FatihMakes** for making their code and projects open-source!
+
+---
 
 An open driver and touchscreen launcher for the **DK-QUAKE / ARIS-68** — the
 1920×480 touchscreen-plus-knob macro device (sold with the closed-source
@@ -11,7 +22,7 @@ software running.
 
 *From top: the grid launcher · a merged-tile Media grid · the flip-clock app · a [Windy](https://www.windy.com) weather map and a [Home Assistant](https://www.home-assistant.io) dashboard — each with the knob's RGB ring lit a different color.*
 
-### **[⬇ Download for Windows](https://github.com/TeeJS/open-quake/releases/)** &nbsp;·&nbsp; or [build from source](docs/building.md)
+### **[⬇ Download Setup / Portable](https://github.com/1dark30-alt/Quake-Jarvis/releases/)** &nbsp;·&nbsp; [Source Code](https://github.com/1dark30-alt/Quake-Jarvis) &nbsp;·&nbsp; or [build from source](docs/building.md)
 
 > **Switching pages:** the panel shows one page at a time — **double-click the knob** to open the page selector, rotate to highlight a page, then press to switch. open-quake shows this tip right on the panel the first time you launch it.
 
@@ -58,17 +69,13 @@ Detailed guides live in **[docs/](docs/README.md)**:
 
 ## Download
 
-Grab a build from the **[Releases](https://github.com/TeeJS/open-quake/releases)** page (Windows x64):
-- **`open-quake-<version>-portable.exe`** — run directly, no install.
-- **`open-quake-<version>-setup.exe`** — installer (Start-menu shortcut + uninstaller).
+Get the installer or portable builds from this fork's **[Releases](https://github.com/1dark30-alt/Quake-Jarvis/releases)** page (Windows x64):
+- **[open-quake-0.3.0-portable.exe](https://github.com/1dark30-alt/Quake-Jarvis/releases)** — portable executable (run directly, no installation needed).
+- **[open-quake-0.3.0-setup.exe](https://github.com/1dark30-alt/Quake-Jarvis/releases)** — installer setup (creates Start menu shortcuts and includes uninstaller).
 
-The exe is **code-signed** (Azure Trusted Signing, publisher *Thomas Schmitz*) — so you see a
-verified publisher, not "Unknown publisher." Windows SmartScreen may still show a **"Windows
-protected your PC"** prompt on first download; that's reputation-based (it eases as a release
-gains downloads), not a problem with the file. Confirm the publisher reads **Thomas Schmitz**,
-then click **More info → Run anyway**. Plug in the DK-QUAKE, then launch; config is stored in
-`%APPDATA%\open-quake`. (Linux/macOS builds would need platform-specific launch/volume work —
-not done yet.)
+For the original unsigned/signed version by the original developer, visit the upstream **[TeeJS/open-quake Releases](https://github.com/TeeJS/open-quake/releases)**.
+
+To launch the app: plug in the DK-QUAKE, then launch the portable or setup executable. The user grid configuration is stored in `%APPDATA%\open-quake`.
 
 ## Licensing
 
