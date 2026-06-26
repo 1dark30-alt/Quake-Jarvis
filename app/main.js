@@ -986,7 +986,7 @@ app.whenReady().then(async () => {
   try {
     sysserver = require('./sysserver');
     serverPort = await sysserver.start({ onMedia: mediaKey, onLaunch: onAppLaunch, getGridTiles: getActiveAppTiles, getAppConfig: activeServedAppConfig, onOpenExternal: openExternalUrl, appFolders: discoveredServedApps() });
-    ensureSystemViewPage(serverPort); ensureMusicPage(); ensureJarvisPage(); ensureDropInDir();
+    ensureSystemViewPage(serverPort); ensureMusicPage(); ensureJarvisPage(); checkAndStartJarvis(); ensureDropInDir();
     const env = loadEnv(); haschedule.configure({ url: env.HA_URL, token: env.HA_TOKEN });   // HA Schedule dev app creds
     console.log('SystemView + Music + JARVIS on http://127.0.0.1:' + serverPort + (env.HA_URL ? ' · HA Schedule -> ' + env.HA_URL : ''));
   } catch (e) { console.log('local panel services failed to start:', e.message); }
@@ -1162,6 +1162,26 @@ app.whenReady().then(async () => {
   screen.on('display-metrics-changed', () => setTimeout(placePanel, 500));
 });
 }
+function checkAndStartJarvis() {
+  const jarvisVbsPath = path.join(__dirname, '..', 'start_jarvis.vbs');
+  if (!fs.existsSync(jarvisVbsPath)) return;
+
+  const netSocket = require('net');
+  const socket = netSocket.connect({ port: 8000, host: '127.0.0.1', timeout: 500 }, () => {
+    socket.destroy();
+    console.log('[main.js] JARVIS is already running on port 8000.');
+  });
+
+  socket.on('error', () => {
+    console.log('[main.js] JARVIS not running. Spawning start_jarvis.vbs...');
+    execFile('wscript.exe', [jarvisVbsPath], { windowsHide: true }, (err) => {
+      if (err) {
+        console.error('[main.js] Failed to spawn start_jarvis.vbs:', err);
+      }
+    });
+  });
+}
+
 app.on('window-all-closed', () => {});
 app.on('before-quit', () => {
   try { dev.stop(); } catch (e) {}                       // close HID devices + clear keep-alive/rescan timers — an open node-hid handle blocks process exit (Cmd+Q would hang -> force-quit)
