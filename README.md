@@ -22,7 +22,7 @@ software running.
 
 *From top: the grid launcher · a merged-tile Media grid · the flip-clock app · a [Windy](https://www.windy.com) weather map and a [Home Assistant](https://www.home-assistant.io) dashboard — each with the knob's RGB ring lit a different color.*
 
-### **[⬇ Download Setup / Portable](https://github.com/1dark30-alt/Quake-Jarvis/releases/)** &nbsp;·&nbsp; [Source Code](https://github.com/1dark30-alt/Quake-Jarvis) &nbsp;·&nbsp; or [build from source](docs/building.md)
+### **[⬇ Download Installer (v0.3.5)](https://github.com/1dark30-alt/Quake-Jarvis/releases/download/v0.3.5/open-quake-0.3.5-setup.exe) &nbsp;·&nbsp; [⬇ Download Portable (v0.3.5)](https://github.com/1dark30-alt/Quake-Jarvis/releases/download/v0.3.5/open-quake-0.3.5-portable.exe)** &nbsp;·&nbsp; [Source Code](https://github.com/1dark30-alt/Quake-Jarvis) &nbsp;·&nbsp; or [build from source](docs/building.md)
 
 > **Switching pages:** the panel shows one page at a time — **double-click the knob** to open the page selector, rotate to highlight a page, then press to switch. open-quake shows this tip right on the panel the first time you launch it.
 
